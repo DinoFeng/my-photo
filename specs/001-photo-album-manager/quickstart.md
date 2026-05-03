@@ -7,7 +7,7 @@
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| Node.js | 18+ | LTS recommended |
+| Node.js | 22+ | LTS recommended |
 | pnpm | 8+ | Package manager (required) |
 | Python | 3.10+ | Only for AI service (Phase 2) |
 | Git | 2.0+ | Version control |
