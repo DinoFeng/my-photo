@@ -17,12 +17,12 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Initialize Quasar + Electron project with pnpm in package.json
-- [ ] T002 [P] Create project directory structure per implementation plan
-- [ ] T003 [P] Configure TypeScript and tsconfig.json
-- [ ] T004 [P] Create .npmrc with pnpm and Node 22 constraints
-- [ ] T005 [P] Configure Quasar and Electron in quasar.config.js
-- [ ] T006 [P] Setup Vitest for unit testing in vitest.config.js
+- [X] T001 Initialize Quasar + Electron project with pnpm in package.json
+- [X] T002 [P] Create project directory structure per implementation plan
+- [X] T003 [P] Configure TypeScript and tsconfig.json
+- [X] T004 [P] Create .npmrc with pnpm and Node 22 constraints
+- [X] T005 [P] Configure Quasar and Electron in quasar.config.js
+- [X] T006 [P] Setup Vitest for unit testing in vitest.config.js
 
 ---
 
@@ -32,14 +32,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Setup SQLite database and TypeORM in server/db/index.js
-- [ ] T008 [P] Create core database models (Photo, Album, Setting, ImportTask, AlbumPhoto, PhotoTag) in server/db/models/
+- [X] T007 Setup SQLite database and TypeORM in server/db/index.js
+- [X] T008 [P] Create core database models (Photo, Album, Setting, ImportTask, AlbumPhoto, PhotoTag) in server/db/models/
 - [ ] T009 [P] Create database migration files in server/db/migrations/
-- [ ] T010 Setup Express.js API foundation in server/app.js
-- [ ] T011 Create shared utility modules (fileUtils.js, pathUtils.js, hashUtils.js) in server/utils/
-- [ ] T012 Setup Electron main process in electron/main.js
+- [X] T010 Setup Express.js API foundation in server/app.js
+- [X] T011 Create shared utility modules (fileUtils.js, pathUtils.js, hashUtils.js) in server/utils/
+- [X] T012 Setup Electron main process in electron/main.js
 - [ ] T013 Create Electron IPC handlers in electron/ipc/handlers.js
-- [ ] T014 Setup Quasar frontend foundation with Pinia stores and Router
+- [X] T014 Setup Quasar frontend foundation with Pinia stores and Router
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

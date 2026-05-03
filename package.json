@@ -1,0 +1,54 @@
+{
+  "name": "my-photo",
+  "version": "1.0.0",
+  "description": "照片整理应用",
+  "type": "module",
+  "scripts": {
+    "dev:server": "node --import tsx server/app.ts",
+    "dev:server-simple": "node --import tsx server/app-simple.ts",
+    "dev:client": "vite",
+    "dev": "concurrently \"pnpm dev:server-simple\" \"pnpm dev:client\"",
+    "build": "vite build",
+    "electron:dev": "vite build && electron .",
+    "electron:build": "electron-builder",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.4",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^9.4.1",
+    "chokidar": "^3.6.0",
+    "cors": "^2.8.5",
+    "exifr": "^7.1.3",
+    "express": "^4.18.2",
+    "pinia": "^2.1.7",
+    "quasar": "^2.15.0",
+    "reflect-metadata": "^0.2.1",
+    "sharp": "^0.33.2",
+    "sqlite3": "^6.0.1",
+    "typeorm": "^0.3.20",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@quasar/vite-plugin": "^1.5.0",
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.11.0",
+    "@vue/test-utils": "^2.4.4",
+    "concurrently": "^9.2.1",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "sass": "^1.70.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
