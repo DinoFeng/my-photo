@@ -8,12 +8,12 @@ app.use(cors())
 app.use(express.json())
 
 const photos: any[] = [
-  { id: '1', fileName: 'photo1.jpg', filePath: '/photos/photo1.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=1', takenDate: '2024-01-01', fileSize: 1024000, width: 1920, height: 1080 },
-  { id: '2', fileName: 'photo2.jpg', filePath: '/photos/photo2.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=2', takenDate: '2024-01-02', fileSize: 2048000, width: 1920, height: 1080 },
-  { id: '3', fileName: 'photo3.jpg', filePath: '/photos/photo3.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=3', takenDate: '2024-01-03', fileSize: 1536000, width: 1920, height: 1080 },
-  { id: '4', fileName: 'photo4.jpg', filePath: '/photos/photo4.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=4', takenDate: '2024-01-04', fileSize: 2048000, width: 1920, height: 1080 },
-  { id: '5', fileName: 'photo5.jpg', filePath: '/photos/photo5.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=5', takenDate: '2024-01-05', fileSize: 1024000, width: 1920, height: 1080 },
-  { id: '6', fileName: 'photo6.jpg', filePath: '/photos/photo6.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=6', takenDate: '2024-01-06', fileSize: 2560000, width: 1920, height: 1080 },
+  { id: '1', fileName: 'photo1.jpg', filePath: '/photos/photo1.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=1', takenDate: '2024-01-01', fileSize: 1024000, width: 1920, height: 1080, importedAt: '2024-01-01T00:00:00Z' },
+  { id: '2', fileName: 'photo2.jpg', filePath: '/photos/photo2.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=2', takenDate: '2024-01-02', fileSize: 2048000, width: 1920, height: 1080, importedAt: '2024-01-02T00:00:00Z' },
+  { id: '3', fileName: 'photo3.jpg', filePath: '/photos/photo3.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=3', takenDate: '2024-01-03', fileSize: 1536000, width: 1920, height: 1080, importedAt: '2024-01-03T00:00:00Z' },
+  { id: '4', fileName: 'photo4.jpg', filePath: '/photos/photo4.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=4', takenDate: '2024-01-04', fileSize: 2048000, width: 1920, height: 1080, importedAt: '2024-01-04T00:00:00Z' },
+  { id: '5', fileName: 'photo5.jpg', filePath: '/photos/photo5.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=5', takenDate: '2024-01-05', fileSize: 1024000, width: 1920, height: 1080, importedAt: '2024-01-05T00:00:00Z' },
+  { id: '6', fileName: 'photo6.jpg', filePath: '/photos/photo6.jpg', thumbnailPath: 'https://picsum.photos/400/300?random=6', takenDate: '2024-01-06', fileSize: 2560000, width: 1920, height: 1080, importedAt: '2024-01-06T00:00:00Z' },
 ]
 
 const albums: any[] = [
@@ -201,6 +201,52 @@ app.get('/api/scanner/scan-watch', (req, res) => {
 
 app.get('/api/scanner/scan-source', (req, res) => {
   res.json({ files: [], total: 0 })
+})
+
+app.get('/api/search/search', (req, res) => {
+  const { query, camera, location } = req.query
+  let result = [...photos]
+
+  if (query) {
+    const q = (query as string).toLowerCase()
+    result = result.filter(p => p.fileName.toLowerCase().includes(q))
+  }
+
+  if (camera) {
+    result = result.filter(p => p.exif?.camera === camera)
+  }
+
+  if (location) {
+    result = result.filter(p => p.exif?.gps?.city === location || p.exif?.gps?.country === location)
+  }
+
+  res.json(result)
+})
+
+app.get('/api/search/cameras', (req, res) => {
+  const cameras = [...new Set(photos.filter(p => p.exif?.camera).map(p => p.exif.camera))]
+  res.json(cameras)
+})
+
+app.get('/api/search/locations', (req, res) => {
+  const locations = [...new Set(photos.filter(p => p.exif?.gps?.city).map(p => p.exif.gps.city))]
+  res.json(locations)
+})
+
+app.get('/api/organize/preview', (req, res) => {
+  res.json({ previews: [] })
+})
+
+app.post('/api/organize/execute', (req, res) => {
+  res.json({ success: true, moved: 0, skipped: photos.length, failed: 0, errors: [] })
+})
+
+app.get('/api/organize/stats', (req, res) => {
+  res.json({
+    totalPhotos: photos.length,
+    organized: photos.length,
+    toOrganize: 0
+  })
 })
 
 app.listen(PORT, '0.0.0.0', () => {
