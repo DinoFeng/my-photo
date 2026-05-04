@@ -34,11 +34,11 @@
 
 - [X] T007 Setup SQLite database and TypeORM in server/db/index.js
 - [X] T008 [P] Create core database models (Photo, Album, Setting, ImportTask, AlbumPhoto, PhotoTag) in server/db/models/
-- [ ] T009 [P] Create database migration files in server/db/migrations/
+- [X] T009 [P] Create database migration files in server/db/migrations/
 - [X] T010 Setup Express.js API foundation in server/app.js
 - [X] T011 Create shared utility modules (fileUtils.js, pathUtils.js, hashUtils.js) in server/utils/
 - [X] T012 Setup Electron main process in electron/main.js
-- [ ] T013 Create Electron IPC handlers in electron/ipc/handlers.js
+- [X] T013 Create Electron IPC handlers in electron/ipc/handlers.js
 - [X] T014 Setup Quasar frontend foundation with Pinia stores and Router
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
@@ -53,22 +53,22 @@
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Create Setting entity model in server/db/models/Setting.js
-- [ ] T016 [P] [US1] Create ImportTask entity model in server/db/models/ImportTask.js
-- [ ] T017 [P] [US1] Implement SettingService in server/services/SettingService.js
-- [ ] T018 [P] [US1] Implement ImportService in server/services/ImportService.js
-- [ ] T019 [P] [US1] Implement ExifService in server/services/ExifService.js
-- [ ] T020 [P] [US1] Implement DuplicateService in server/services/DuplicateService.js
-- [ ] T021 [P] [US1] Implement ThumbnailService in server/services/ThumbnailService.js
-- [ ] T022 [US1] Implement settings API routes in server/routes/settings.js
-- [ ] T023 [US1] Implement import API routes in server/routes/import.js
-- [ ] T024 [US1] Implement scanner API routes in server/routes/scanner.js
-- [ ] T025 [US1] Create config settings Pinia store in src/stores/settings.js
-- [ ] T026 [US1] Create import status Pinia store in src/stores/import.js
-- [ ] T027 [US1] Create configuration wizard page in src/pages/SetupWizard.vue
-- [ ] T028 [US1] Create ImportDialog component in src/components/ImportDialog.vue
-- [ ] T029 [US1] Create DuplicateDialog component in src/components/DuplicateDialog.vue
-- [ ] T030 [US1] Setup directory monitoring with chokidar in Electron main process
+- [X] T015 [P] [US1] Create Setting entity model in server/db/models/Setting.js
+- [X] T016 [P] [US1] Create ImportTask entity model in server/db/models/ImportTask.js
+- [X] T017 [P] [US1] Implement SettingService in server/services/SettingService.js
+- [X] T018 [P] [US1] Implement ImportService in server/services/ImportService.js
+- [X] T019 [P] [US1] Implement ExifService in server/services/ExifService.js
+- [X] T020 [P] [US1] Implement DuplicateService in server/services/DuplicateService.js
+- [X] T021 [P] [US1] Implement ThumbnailService in server/services/ThumbnailService.js
+- [X] T022 [US1] Implement settings API routes in server/routes/settings.js
+- [X] T023 [US1] Implement import API routes in server/routes/import.js
+- [X] T024 [US1] Implement scanner API routes in server/routes/scanner.js
+- [X] T025 [US1] Create config settings Pinia store in src/stores/settings.js
+- [X] T026 [US1] Create import status Pinia store in src/stores/import.js
+- [X] T027 [US1] Create configuration wizard page in src/pages/SetupPage.vue
+- [X] T028 [US1] Create ImportDialog component in src/components/ImportDialog.vue
+- [X] T029 [US1] Create DuplicateDialog component in src/components/DuplicateDialog.vue
+- [X] T030 [US1] Setup directory monitoring with chokidar in Electron main process
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
