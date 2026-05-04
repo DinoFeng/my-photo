@@ -17,18 +17,19 @@
               <q-card class="h-full">
                 <q-card-section class="q-pa-none">
                   <q-img 
-                    :src="album.coverPath" 
+                    :src="getCoverUrl(album.coverPath)" 
                     class="rounded-t-lg"
                     style="height: 120px; object-fit: cover;"
                   />
                 </q-card-section>
                 <q-card-section class="q-pa-sm">
                   <span class="text-caption">{{ album.name }}</span>
-                  <span class="text-xs text-grey-500">{{ album.photoCount }} 张照片</span>
+                  <span class="text-xs text-grey-500 ml-2">{{ album.photoCount }} 张照片</span>
                 </q-card-section>
               </q-card>
             </div>
           </div>
+          <p v-if="albums.length === 0" class="text-center text-grey q-pa-md">暂无相册</p>
         </q-card-section>
       </q-card>
     </div>
@@ -52,22 +53,27 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { api } from '@/api'
 
-const albums = ref([])
+const albums = ref<any[]>([])
 const showCreateDialog = ref(false)
 const newAlbumName = ref('')
 
 onMounted(async () => {
-  albums.value = await fetchAlbums()
+  await fetchAlbums()
 })
 
 async function fetchAlbums() {
   try {
-    const response = await fetch('/api/albums')
-    return await response.json()
+    albums.value = await api.albums.getAll()
   } catch {
-    return []
+    albums.value = []
   }
+}
+
+function getCoverUrl(path: string | undefined) {
+  if (!path) return 'https://picsum.photos/200/150'
+  return `/api/photos/thumbnail/${path}`
 }
 
 function openAlbum(id: string) {
@@ -78,12 +84,8 @@ async function createAlbum() {
   if (!newAlbumName.value.trim()) return
   
   try {
-    await fetch('/api/albums', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newAlbumName.value })
-    })
-    albums.value = await fetchAlbums()
+    await api.albums.create({ name: newAlbumName.value })
+    await fetchAlbums()
     newAlbumName.value = ''
     showCreateDialog.value = false
   } catch (e) {

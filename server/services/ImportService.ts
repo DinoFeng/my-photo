@@ -1,152 +1,209 @@
 import { AppDataSource } from '../db/index.js'
 import ImportTask from '../db/models/ImportTask.js'
 import Photo from '../db/models/Photo.js'
-import { getSettings } from './SettingService.js'
-import { createPhoto, extractExif, generateThumbnail, findDuplicatePhotos } from './PhotoService.js'
+import AlbumPhoto from '../db/models/AlbumPhoto.js'
+import { extractExif, generateThumbnail } from './PhotoService.js'
 import { calculateFileHash } from '../utils/hashUtils.js'
-import { moveFile, listFiles, ensureDirectory, fileExists, PHOTO_EXTENSIONS } from '../utils/fileUtils.js'
-import { buildTargetPath } from '../utils/pathUtils.js'
-import { join } from 'path'
+import { fileExists, getFileSize } from '../utils/fileUtils.js'
+import { getSettings, updateSettings } from './SettingService.js'
+import { createSystemAlbums, getSystemAlbums } from './AlbumService.js'
+import { join, basename } from 'path'
+import { promises as fs } from 'fs'
+import chokidar from 'chokidar'
 
 const importTaskRepository = AppDataSource.getRepository(ImportTask)
 const photoRepository = AppDataSource.getRepository(Photo)
+const albumPhotoRepository = AppDataSource.getRepository(AlbumPhoto)
 
-export async function scanWatchDirectory(): Promise<{ tasks: ImportTask[], duplicates: any[] }> {
-  const settings = await getSettings()
-  const watchPath = settings.watchPath
+export type ImportStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'duplicate'
+
+export async function createImportTask(sourcePath: string, targetPath?: string): Promise<ImportTask> {
+  const task = importTaskRepository.create({
+    sourcePath,
+    targetPath: targetPath || null,
+    fileName: basename(sourcePath),
+    fileHash: null,
+    status: 'pending',
+    errorMessage: null
+  })
+  return await importTaskRepository.save(task)
+}
+
+export async function getImportTasks(status?: string): Promise<ImportTask[]> {
+  const query = importTaskRepository.createQueryBuilder('task')
   
-  if (!watchPath) {
-    return { tasks: [], duplicates: [] }
+  if (status) {
+    query.where('task.status = :status', { status })
   }
   
-  const files = await listFiles(watchPath, PHOTO_EXTENSIONS)
-  const tasks: ImportTask[] = []
-  const duplicates: any[] = []
-  
-  for (const filePath of files) {
-    const fileName = filePath.split('/').pop() || ''
+  return await query.orderBy('task.createdAt', 'DESC').getMany()
+}
+
+export async function updateImportTask(id: string, updates: Partial<ImportTask>): Promise<void> {
+  await importTaskRepository.update(id, updates)
+}
+
+export async function deleteImportTask(id: string): Promise<void> {
+  await importTaskRepository.delete(id)
+}
+
+export async function processImportTasks(): Promise<{ imported: number; duplicates: number; failed: number }> {
+  const pendingTasks = await getImportTasks('pending')
+  let imported = 0
+  let duplicates = 0
+  let failed = 0
+
+  for (const task of pendingTasks) {
+    await updateImportTask(task.id, { status: 'processing' })
     
-    const fileHash = await calculateFileHash(filePath)
-    const existingPhotos = await findDuplicatePhotos(fileHash)
-    
-    if (existingPhotos.length > 0) {
-      duplicates.push({
-        id: Date.now().toString(),
-        fileName,
-        filePath,
-        existingPhotoId: existingPhotos[0].id,
-        action: 'skip'
+    try {
+      const result = await processSingleFile(task.sourcePath)
+      
+      if (result === 'duplicate') {
+        await updateImportTask(task.id, { status: 'duplicate' })
+        duplicates++
+      } else if (result === 'success') {
+        await updateImportTask(task.id, { status: 'completed', completedAt: new Date() })
+        imported++
+      }
+    } catch (error) {
+      await updateImportTask(task.id, { 
+        status: 'failed', 
+        errorMessage: error instanceof Error ? error.message : 'Unknown error' 
       })
-    } else {
-      const task = importTaskRepository.create({
-        sourcePath: filePath,
-        fileName,
-        fileHash,
-        status: 'pending'
-      })
-      tasks.push(await importTaskRepository.save(task))
+      failed++
     }
   }
-  
-  return { tasks, duplicates }
+
+  return { imported, duplicates, failed }
 }
 
-export async function processImportTasks(): Promise<void> {
+export async function processSingleFile(sourcePath: string): Promise<'success' | 'duplicate'> {
+  if (!await fileExists(sourcePath)) {
+    throw new Error('文件不存在')
+  }
+
+  const fileHash = await calculateFileHash(sourcePath)
+  const existingPhoto = await photoRepository.findOne({ where: { fileHash } })
+
+  if (existingPhoto) {
+    return 'duplicate'
+  }
+
+  const exif = await extractExif(sourcePath)
   const settings = await getSettings()
-  const pendingTasks = await importTaskRepository.find({ where: { status: 'pending' } })
   
-  for (const task of pendingTasks) {
-    await processImportTask(task.id, settings)
-  }
-}
+  const targetPath = buildTargetPath(sourcePath, exif, settings.organizePattern)
+  
+  await fs.mkdir(join(targetPath, '..'), { recursive: true })
+  await fs.copyFile(sourcePath, targetPath)
 
-export async function processImportTask(taskId: string, settings?: any): Promise<void> {
-  const task = await importTaskRepository.findOne({ where: { id: taskId } })
-  if (!task) return
+  const thumbnailPath = await generateThumbnail(targetPath, join(settings.photoSourcePath || '', 'thumbnails'))
   
-  if (!settings) {
-    settings = await getSettings()
-  }
-  
-  const exif = await extractExif(task.sourcePath)
-  
-  const targetPath = join(settings.photoSourcePath, buildTargetPath(settings.organizePattern, exif, task.fileName))
-  
-  await importTaskRepository.update(taskId, { 
-    status: 'processing',
-    targetPath
+  const photo = photoRepository.create({
+    filePath: targetPath,
+    fileName: basename(targetPath),
+    fileHash,
+    thumbnailPath,
+    exif,
+    takenDate: exif?.date,
+    fileSize: await getFileSize(sourcePath),
+    width: exif?.width || 0,
+    height: exif?.height || 0
   })
   
-  try {
-    await ensureDirectory(join(settings.photoSourcePath, settings.organizePattern))
-    await moveFile(task.sourcePath, targetPath)
-    
-    const thumbnailPath = await generateThumbnail(targetPath, join(settings.photoSourcePath, 'thumbnails'))
-    await createPhoto(targetPath, exif, thumbnailPath)
-    
-    await importTaskRepository.update(taskId, { 
-      status: 'completed',
-      completedAt: new Date()
-    })
-  } catch (error) {
-    await importTaskRepository.update(taskId, { 
-      status: 'failed',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
+  await photoRepository.save(photo)
+
+  await addPhotoToSystemAlbums(photo, exif)
+
+  return 'success'
 }
 
-export async function handleDuplicates(duplicates: { id: string, action: string }[]): Promise<void> {
-  const settings = await getSettings()
+function buildTargetPath(sourcePath: string, exif: any, pattern: string): string {
+  const fileName = basename(sourcePath)
+  const date = exif?.date ? new Date(exif.date) : new Date()
   
-  for (const dup of duplicates) {
-    const task = await importTaskRepository.findOne({ where: { id: dup.id } })
-    if (!task) continue
-    
-    switch (dup.action) {
-      case 'rename':
-        const baseName = task.fileName.replace(/\.[^/.]+$/, '')
-        const ext = task.fileName.split('.').pop() || ''
-        let counter = 1
-        let newName = `${baseName}_${counter}.${ext}`
+  let targetPath = pattern
+    .replace('{year}', date.getFullYear().toString())
+    .replace('{month}', String(date.getMonth() + 1).padStart(2, '0'))
+    .replace('{day}', String(date.getDate()).padStart(2, '0'))
+    .replace('{camera}', exif?.camera || 'Unknown')
+    .replace('{model}', exif?.model || 'Unknown')
+    .replace('{city}', exif?.gps?.city || 'Unknown')
+    .replace('{country}', exif?.gps?.country || 'Unknown')
+
+  return join(targetPath, fileName)
+}
+
+async function addPhotoToSystemAlbums(photo: Photo, exif: any): Promise<void> {
+  await createSystemAlbums()
+  const albums = await getSystemAlbums()
+  
+  for (const album of albums) {
+    const shouldAdd = determineAlbumInclusion(album, exif)
+    if (shouldAdd) {
+      const existing = await albumPhotoRepository.findOne({
+        where: { albumId: album.id, photoId: photo.id }
+      })
+      
+      if (!existing) {
+        const albumPhoto = albumPhotoRepository.create({
+          albumId: album.id,
+          photoId: photo.id
+        })
+        await albumPhotoRepository.save(albumPhoto)
         
-        while (await fileExists(join(settings.photoSourcePath, newName))) {
-          counter++
-          newName = `${baseName}_${counter}.${ext}`
-        }
-        
-        const targetPath = join(settings.photoSourcePath, newName)
-        await moveFile(task.sourcePath, targetPath)
-        
-        const exif = await extractExif(targetPath)
-        const thumbnailPath = await generateThumbnail(targetPath, join(settings.photoSourcePath, 'thumbnails'))
-        await createPhoto(targetPath, exif, thumbnailPath)
-        
-        await importTaskRepository.update(task.id, { status: 'completed', completedAt: new Date() })
-        break
-        
-      case 'overwrite':
-        const existingPhoto = await photoRepository.findOne({ where: { fileHash: task.fileHash } })
-        if (existingPhoto) {
-          await moveFile(task.sourcePath, existingPhoto.filePath)
-          await importTaskRepository.update(task.id, { status: 'completed', completedAt: new Date() })
-        }
-        break
-        
-      case 'skip':
-      default:
-        await importTaskRepository.update(task.id, { status: 'completed', completedAt: new Date() })
-        break
+        await albumPhotoRepository.increment(
+          { id: album.id },
+          'photoCount',
+          1
+        )
+      }
     }
   }
 }
 
-export async function getPendingDuplicates(): Promise<any[]> {
-  const duplicates = await importTaskRepository.find({ where: { status: 'duplicate' } })
-  return duplicates.map(d => ({
-    id: d.id,
-    fileName: d.fileName,
-    filePath: d.sourcePath,
-    action: 'skip'
-  }))
+function determineAlbumInclusion(album: { name: string; rule?: string | null }, exif: any): boolean {
+  if (!album.rule) return false
+  
+  if (album.rule.includes('{year}')) return true
+  if (album.rule.includes('{camera}') && exif?.camera) return true
+  if (album.rule.includes('{city}') && exif?.gps?.city) return true
+  
+  return false
+}
+
+let watcher: chokidar.FSWatcher | null = null
+
+export function startDirectoryWatcher(): void {
+  if (watcher) {
+    watcher.close()
+  }
+
+  getSettings().then(settings => {
+    if (!settings.watchPath) return
+
+    watcher = chokidar.watch(settings.watchPath, {
+      ignored: /(^|[\/\\])\../,
+      persistent: true,
+      ignoreInitial: true
+    })
+
+    watcher.on('add', async (path) => {
+      const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.raw']
+      const ext = path.toLowerCase().substring(path.lastIndexOf('.'))
+      
+      if (extensions.includes(ext)) {
+        await createImportTask(path)
+        await processImportTasks()
+      }
+    })
+  })
+}
+
+export function stopDirectoryWatcher(): void {
+  if (watcher) {
+    watcher.close()
+    watcher = null
+  }
 }

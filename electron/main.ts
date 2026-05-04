@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { startServer } from '../server/app.js'
+import { setupIpcHandlers } from './ipc/handlers.js'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -29,6 +30,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   await startServer()
+  setupIpcHandlers()
   createWindow()
 
   app.on('activate', () => {
@@ -42,21 +44,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
-})
-
-ipcMain.handle('select-directory', async () => {
-  const { dialog } = await import('electron')
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
-  })
-  
-  if (result.canceled) {
-    return null
-  }
-  
-  return result.filePaths[0]
-})
-
-ipcMain.handle('get-app-data-path', () => {
-  return app.getPath('userData')
 })

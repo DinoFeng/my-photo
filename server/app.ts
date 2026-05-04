@@ -5,10 +5,9 @@ import { createSystemAlbums } from './services/AlbumService.js'
 import photosRouter from './routes/photos.js'
 import albumsRouter from './routes/albums.js'
 import settingsRouter from './routes/settings.js'
-import importRouter from './routes/import.js'
 
 const app = express()
-const PORT = process.env.PORT || 3000
+const PORT = parseInt(process.env.PORT || '3000', 10)
 
 app.use(cors())
 app.use(express.json())
@@ -16,7 +15,6 @@ app.use(express.json())
 app.use('/api/photos', photosRouter)
 app.use('/api/albums', albumsRouter)
 app.use('/api/settings', settingsRouter)
-app.use('/api/import', importRouter)
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() })

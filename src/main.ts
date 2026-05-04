@@ -10,6 +10,7 @@ import './css/app.scss'
 
 const routes = [
   { path: '/', component: () => import('./pages/Index.vue') },
+  { path: '/setup', component: () => import('./pages/SetupPage.vue') },
   { path: '/albums', component: () => import('./pages/Albums.vue') },
   { path: '/photo/:id', component: () => import('./pages/PhotoDetail.vue') },
   { path: '/settings', component: () => import('./pages/Settings.vue') },

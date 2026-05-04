@@ -1,12 +1,14 @@
-import { Router } from 'express'
-import { getSettings, updateSettings, validateDirectorySettings } from '../services/SettingService.js'
+import express from 'express'
+import {
+  getSettings,
+  updateSettings,
+  validateDirectorySettings
+} from '../services/SettingService.js'
 import {
   createImportTask,
   getImportTasks,
   processImportTasks,
-  deleteImportTask,
-  startDirectoryWatcher,
-  stopDirectoryWatcher
+  deleteImportTask
 } from '../services/ImportService.js'
 import {
   findAllDuplicates,
@@ -14,41 +16,32 @@ import {
   handleDuplicate
 } from '../services/DuplicateService.js'
 
-const router = Router()
+const router = express.Router()
 
-router.get('/', async (req, res) => {
+router.get('/settings', async (req, res) => {
   try {
     const settings = await getSettings()
     res.json(settings)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch settings' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
-router.put('/', async (req, res) => {
+router.put('/settings', async (req, res) => {
   try {
-    const updates = req.body
+    const { photoSourcePath, watchPath, ...updates } = req.body
     
-    if (updates.photoSourcePath || updates.watchPath) {
-      const errors = await validateDirectorySettings(
-        updates.photoSourcePath || '',
-        updates.watchPath || ''
-      )
+    if (photoSourcePath || watchPath) {
+      const errors = await validateDirectorySettings(photoSourcePath || '', watchPath || '')
       if (errors) {
         return res.status(400).json({ errors })
       }
     }
     
-    const settings = await updateSettings(updates)
-    
-    if (updates.watchPath) {
-      stopDirectoryWatcher()
-      startDirectoryWatcher()
-    }
-    
+    const settings = await updateSettings({ photoSourcePath, watchPath, ...updates })
     res.json(settings)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update settings' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -58,7 +51,7 @@ router.get('/import/tasks', async (req, res) => {
     const tasks = await getImportTasks(status as string)
     res.json(tasks)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch import tasks' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -68,7 +61,7 @@ router.post('/import/tasks', async (req, res) => {
     const task = await createImportTask(sourcePath, targetPath)
     res.status(201).json(task)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create import task' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -77,7 +70,7 @@ router.delete('/import/tasks/:id', async (req, res) => {
     await deleteImportTask(req.params.id)
     res.status(204).send()
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete import task' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -86,7 +79,7 @@ router.post('/import/process', async (req, res) => {
     const result = await processImportTasks()
     res.json(result)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to process imports' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -95,7 +88,7 @@ router.get('/duplicates', async (req, res) => {
     const duplicates = await findAllDuplicates()
     res.json(duplicates)
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch duplicates' })
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' })
   }
 })
 
@@ -104,7 +97,7 @@ router.delete('/duplicates/:id', async (req, res) => {
     await deleteDuplicate(req.params.id)
     res.status(204).send()
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to delete duplicate' })
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Bad request' })
   }
 })
 
@@ -114,7 +107,7 @@ router.post('/duplicates/:taskId/handle', async (req, res) => {
     await handleDuplicate(req.params.taskId, action as 'skip' | 'rename' | 'overwrite')
     res.status(204).send()
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to handle duplicate' })
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Bad request' })
   }
 })
 
