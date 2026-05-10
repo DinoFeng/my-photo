@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SourceDirectory {
+  id            String    @id @default(cuid())
+  path          String    @unique
+  name          String
+  enabled       Boolean   @default(true)
+  lastScanned   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  medias        Media[]
+  scanCheckpoint ScanCheckpoint?
+}
+
+model Media {
+  id              String     @id @default(cuid())
+  sourceDirectoryId String
+  sourceDirectory  SourceDirectory @relation(fields: [sourceDirectoryId], references: [id], onDelete: Cascade)
+  filename        String
+  filepath        String
+  fileSize        BigInt
+  fileType        String
+  hash            String?
+  width           Int?
+  height          Int?
+  duration        Float?
+  make            String?
+  model           String?
+  dateTaken       DateTime?
+  latitude        Float?
+  longitude       Float?
+  metadata        String?
+  thumbnailPath   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([sourceDirectoryId, filepath])
+}
+
+model Setting {
+  id              String    @id @default(cuid())
+  key             String    @unique
+  value           String
+  description     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ScanCheckpoint {
+  id              String    @id @default(cuid())
+  sourceDirectoryId String  @unique
+  sourceDirectory  SourceDirectory @relation(fields: [sourceDirectoryId], references: [id], onDelete: Cascade)
+  lastScannedFile String?
+  status          String    @default("idle")
+  progress        Float     @default(0)
+  totalFiles      Int       @default(0)
+  scannedFiles    Int       @default(0)
+  errorCount      Int       @default(0)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}

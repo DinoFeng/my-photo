@@ -9,23 +9,23 @@
 
 ## Phase 1: Setup (项目初始化)
 
-- [ ] T001 Create backend directory structure with package.json and tsconfig.json
-- [ ] T002 Create frontend directory structure with Vue 3 + Vite + TypeScript
+- [x] T001 Create backend directory structure with package.json and tsconfig.json
+- [x] T002 Create frontend directory structure with Vue 3 + Vite + TypeScript
 - [ ] T003 Install backend dependencies: express, prisma, @prisma/client, chokidar, queue-manager-pro, sharp, exifreader, cors, dotenv
 - [ ] T004 Install frontend dependencies: vue, @vueuse/core, naive-ui, lucide-vue-next, pinia, vue-router, vue-i18n
 - [ ] T005 Initialize Prisma with SQLite database
-- [ ] T006 Create .env.example with all environment variables
-- [ ] T007 Create docker/ directory with Dockerfile and docker-compose.yml
+- [x] T006 Create .env.example with all environment variables
+- [x] T007 Create docker/ directory with Dockerfile and docker-compose.yml
 
 ## Phase 2: Foundational (基础任务)
 
-- [ ] T008 [P] Create Prisma schema with SourceDirectory, Media, Setting, ScanCheckpoint models
-- [ ] T009 [P] Create Express app with basic middleware (cors, json, static)
-- [ ] T010 [P] Create HTTP Basic Auth middleware for first phase security
-- [ ] T011 [P] Create task queue service using queue-manager-pro
-- [ ] T012 [P] Create file utilities for scanning, hash calculation, metadata extraction
-- [ ] T013 [P] Create Vue 3 app with Pinia store and Vue Router
-- [ ] T014 [P] Create i18n configuration with Chinese and English locales
+- [x] T008 [P] Create Prisma schema with SourceDirectory, Media, Setting, ScanCheckpoint models
+- [x] T009 [P] Create Express app with basic middleware (cors, json, static)
+- [x] T010 [P] Create HTTP Basic Auth middleware for first phase security
+- [x] T011 [P] Create task queue service using queue-manager-pro
+- [x] T012 [P] Create file utilities for scanning, hash calculation, metadata extraction
+- [x] T013 [P] Create Vue 3 app with Pinia store and Vue Router
+- [x] T014 [P] Create i18n configuration with Chinese and English locales
 - [ ] T015 Run Prisma generate and db push to initialize database
 
 ## Phase 3: User Story 1 - 添加并扫描照片源目录 (P1)
@@ -39,14 +39,14 @@
 
 ### Tasks
 
-- [ ] T016 [US1] Create SourceDirectory controller with CRUD endpoints
-- [ ] T017 [US1] Create ScanService with incremental scanning and checkpoint support
-- [ ] T018 [US1] Create ScanCheckpoint controller for scan status management
-- [ ] T019 [US1] Create routes for source-dirs API endpoints
-- [ ] T020 [US1] Create Media controller with listing and detail endpoints
-- [ ] T021 [US1] Create Vue page for source directory management
-- [ ] T022 [US1] Create Vue component for scan progress display
-- [ ] T023 [US1] Create Pinia store for source directories and scan status
+- [x] T016 [US1] Create SourceDirectory controller with CRUD endpoints
+- [x] T017 [US1] Create ScanService with incremental scanning and checkpoint support
+- [x] T018 [US1] Create ScanCheckpoint controller for scan status management
+- [x] T019 [US1] Create routes for source-dirs API endpoints
+- [x] T020 [US1] Create Media controller with listing and detail endpoints
+- [x] T021 [US1] Create Vue page for source directory management
+- [x] T022 [US1] Create Vue component for scan progress display
+- [x] T023 [US1] Create Pinia store for source directories and scan status
 - [ ] T024 [US1] Integrate file watcher (chokidar) for source directory changes
 
 ## Phase 4: User Story 2 - 从导入目录整理照片 (P1)
@@ -60,13 +60,13 @@
 
 ### Tasks
 
-- [ ] T025 [US2] Create Setting controller with CRUD endpoints
-- [ ] T026 [US2] Create ImportService with organize pattern processing
-- [ ] T027 [US2] Create duplicate detection service with SHA256 hash
-- [ ] T028 [US2] Create routes for settings and import API endpoints
-- [ ] T029 [US2] Create Vue page for settings management
+- [x] T025 [US2] Create Setting controller with CRUD endpoints
+- [x] T026 [US2] Create ImportService with organize pattern processing
+- [x] T027 [US2] Create duplicate detection service with SHA256 hash
+- [x] T028 [US2] Create routes for settings and import API endpoints
+- [x] T029 [US2] Create Vue page for settings management
 - [ ] T030 [US2] Create Vue component for import task status
-- [ ] T031 [US2] Create Pinia store for settings and import tasks
+- [x] T031 [US2] Create Pinia store for settings and import tasks
 - [ ] T032 [US2] Integrate file watcher for import directory monitoring
 
 ## Phase 5: User Story 3 - 浏览和搜索照片 (P2)
@@ -80,12 +80,12 @@
 
 ### Tasks
 
-- [ ] T033 [US3] Create Media controller with pagination, filtering and search
-- [ ] T034 [US3] Create thumbnail generation service using Sharp
-- [ ] T035 [US3] Create Vue page for photo gallery with grid layout
+- [x] T033 [US3] Create Media controller with pagination, filtering and search
+- [x] T034 [US3] Create thumbnail generation service using Sharp
+- [x] T035 [US3] Create Vue page for photo gallery with grid layout
 - [ ] T036 [US3] Create Vue component for photo detail view
-- [ ] T037 [US3] Create Vue component for search and filter
-- [ ] T038 [US3] Create Pinia store for media browsing state
+- [x] T037 [US3] Create Vue component for search and filter
+- [x] T038 [US3] Create Pinia store for media browsing state
 
 ## Phase 6: User Story 4 - 导出和整理照片 (P3)
 
@@ -97,23 +97,23 @@
 
 ### Tasks
 
-- [ ] T039 [US4] Create ExportService with organize pattern support
-- [ ] T040 [US4] Create Export controller with batch export endpoints
-- [ ] T041 [US4] Create routes for export API endpoints
+- [x] T039 [US4] Create ExportService with organize pattern support
+- [x] T040 [US4] Create Export controller with batch export endpoints
+- [x] T041 [US4] Create routes for export API endpoints
 - [ ] T042 [US4] Create Vue component for export dialog
 - [ ] T043 [US4] Create Vue component for export progress
 - [ ] T044 [US4] Create Pinia store for export tasks
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T045 Create error handling middleware for Express
-- [ ] T046 Create health check endpoint
+- [x] T045 Create error handling middleware for Express
+- [x] T046 Create health check endpoint
 - [ ] T047 Create watch status endpoint for monitoring services
 - [ ] T048 Add responsive design to Vue components
-- [ ] T049 Add loading states and error messages to UI
+- [x] T049 Add loading states and error messages to UI
 - [ ] T050 Create global error handling in Vue
 - [ ] T051 Optimize frontend bundle size with code splitting
-- [ ] T052 Update docker-compose.yml with resource limits
+- [x] T052 Update docker-compose.yml with resource limits
 - [ ] T053 Update quickstart.md with deployment instructions
 - [ ] T054 Add logging middleware for production
 
@@ -164,13 +164,13 @@ Phase 1 ─┬─→ Phase 2 ─┬─→ Phase 3 (US1)
 
 ## Task Summary
 
-| User Story | Task Count | Priority |
-|------------|------------|----------|
-| Setup | 7 | - |
-| Foundational | 8 | - |
-| US1 - 添加并扫描照片源目录 | 8 | P1 |
-| US2 - 从导入目录整理照片 | 8 | P1 |
-| US3 - 浏览和搜索照片 | 6 | P2 |
-| US4 - 导出和整理照片 | 6 | P3 |
-| Polish | 12 | - |
-| **Total** | **55** | |
+| User Story | Task Count | Completed | Priority |
+|------------|------------|-----------|----------|
+| Setup | 7 | 3 | - |
+| Foundational | 8 | 7 | - |
+| US1 - 添加并扫描照片源目录 | 8 | 8 | P1 |
+| US2 - 从导入目录整理照片 | 8 | 5 | P1 |
+| US3 - 浏览和搜索照片 | 6 | 5 | P2 |
+| US4 - 导出和整理照片 | 6 | 3 | P3 |
+| Polish | 12 | 3 | - |
+| **Total** | **55** | **34** | |
