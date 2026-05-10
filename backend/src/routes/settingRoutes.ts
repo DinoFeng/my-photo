@@ -8,7 +8,7 @@ import {
 } from '../controllers/settingController'
 import { basicAuth } from '../middleware/auth'
 
-const router = Router()
+const router: Router = Router()
 
 router.get('/', basicAuth, getAllSettings)
 router.get('/:key', basicAuth, getSetting)

@@ -90,7 +90,8 @@ onMounted(() => {
   outline: none;
 }
 
-.loading, .empty-state {
+.loading,
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;

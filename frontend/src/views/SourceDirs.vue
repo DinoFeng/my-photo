@@ -101,12 +101,12 @@ onMounted(async () => {
   loading.value = false
 })
 
-const getStatusClass = (dir: typeof directories.value[0]) => {
+const getStatusClass = (dir: typeof directories[0]) => {
   if (!dir.scanCheckpoint) return 'status-idle'
   return `status-${dir.scanCheckpoint.status}`
 }
 
-const getStatusText = (dir: typeof directories.value[0]) => {
+const getStatusText = (dir: typeof directories[0]) => {
   if (!dir.scanCheckpoint) return t('idle')
   switch (dir.scanCheckpoint.status) {
     case 'scanning': return t('scanInProgress')
@@ -125,7 +125,7 @@ const startScan = async (id: string) => {
   await sourceDirStore.startScan(id)
 }
 
-const editDirectory = (dir: typeof directories.value[0]) => {
+const editDirectory = (dir: typeof directories[0]) => {
   editingDirectory.value = { id: dir.id, name: dir.name, path: dir.path }
   formData.value = { name: dir.name, path: dir.path }
   showAddModal.value = true
