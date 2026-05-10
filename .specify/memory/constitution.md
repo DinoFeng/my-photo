@@ -1,50 +1,109 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# NAS 照片管理应用 - 开发宪章
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. 依赖注入解耦原则
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+**定义**：核心基础设施服务（如队列、数据库连接等）不应直接依赖业务逻辑模块。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**实施规则**：
+- 通用服务组件（如 `queueService`）必须保持无业务依赖
+- 业务逻辑通过依赖注入模式注册到基础设施服务
+- 使用独立的消费者注册模块（如 `queueConsumers.ts`）集中管理业务绑定
+- 新增业务功能只需在消费者注册模块中添加，不修改核心服务
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**优势**：
+- 提高代码可测试性和可复用性
+- 便于独立演进和替换基础设施
+- 降低模块间耦合度，提升代码维护性
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. 生产者-消费者分离原则
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**定义**：消息发布者（生产者）与消息处理者（消费者）必须完全解耦。
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**实施规则**：
+- 生产者只知道队列名称，不关心处理逻辑
+- 消费者独立注册，不影响生产者代码
+- 使用统一的消息队列服务作为中间层
+- 支持动态注册和卸载消费者
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**优势**：
+- 支持异步处理和任务队列化
+- 便于扩展和并行处理
+- 提高系统稳定性和可扩展性
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. 单一职责原则
+
+**定义**：每个模块/类只负责一个明确的功能。
+
+**实施规则**：
+- `queueService.ts`：仅提供通用队列操作接口
+- `queueConsumers.ts`：仅负责注册业务消费者
+- 业务服务（如 `scanService`、`importService`）：仅实现具体业务逻辑
+
+**优势**：
+- 代码结构清晰，易于理解
+- 便于定位和修复问题
+- 提高代码复用率
+
+### IV. 延迟初始化原则
+
+**定义**：资源密集型组件仅在首次使用时初始化。
+
+**实施规则**：
+- 队列管理器采用延迟加载模式
+- 通过动态导入减少启动时间
+- 避免不必要的资源占用
+
+**优势**：
+- 优化应用启动性能
+- 减少内存占用
+- 支持按需加载
+
+### V. 模块化设计原则
+
+**定义**：系统应划分为独立、可替换的模块。
+
+**实施规则**：
+- 按功能边界划分模块（照片管理、扫描服务、导入服务等）
+- 模块间通过明确的接口交互
+- 避免循环依赖
+
+**优势**：
+- 便于并行开发和维护
+- 支持独立测试和部署
+- 提高代码可扩展性
+
+## 架构约束
+
+### 依赖方向
+
+- 基础设施层 → 业务逻辑层：不允许直接依赖
+- 业务逻辑层 → 基础设施层：通过依赖注入方式
+- 模块间依赖必须单向流动
+
+### 模块划分标准
+
+| 模块类型 | 职责 | 示例 |
+|---------|------|------|
+| 基础设施层 | 提供通用服务 | queueService, database |
+| 业务服务层 | 实现业务逻辑 | scanService, importService |
+| 消费者注册层 | 绑定业务与基础设施 | queueConsumers |
+| API 控制层 | 处理 HTTP 请求 | controllers |
+
+## 开发工作流程
+
+1. **需求分析**：明确功能需求和边界
+2. **模块设计**：确定模块划分和接口定义
+3. **消费者注册**：在 `queueConsumers.ts` 中注册业务处理器
+4. **业务实现**：在对应的业务服务中实现处理逻辑
+5. **测试验证**：独立测试各模块功能
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- 所有代码变更必须符合本宪章规定的原则
+- 架构变更需经过团队评审
+- 新增模块必须遵循单一职责和依赖注入原则
+- 违反原则的代码提交将被拒绝
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-05-10 | **Last Amended**: 2026-05-10

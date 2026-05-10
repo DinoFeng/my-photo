@@ -5,6 +5,9 @@ import { PrismaClient } from '@prisma/client'
 import apiRoutes from './routes'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 
+// 导入消费者注册模块（确保消费者在应用启动时被注册）
+import './services/queueConsumers'
+
 dotenv.config()
 
 export const prisma = new PrismaClient()
