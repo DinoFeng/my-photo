@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { prisma } from '../server'
-import { startScan } from '../services/scanService'
+import { queueService } from '../services/queueService'
 
 export async function getAllSourceDirectories(req: Request, res: Response) {
   try {
@@ -71,8 +71,8 @@ export async function deleteSourceDirectory(req: Request, res: Response) {
 export async function triggerScan(req: Request, res: Response) {
   try {
     const { id } = req.params
-    startScan(id)
-    res.json({ message: 'Scan started' })
+    const taskId = await queueService.enqueue('scan', { sourceDirectoryId: id })
+    res.json({ message: 'Scan started', taskId })
   } catch (error) {
     res.status(500).json({ error: 'Failed to start scan' })
   }
