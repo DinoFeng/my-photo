@@ -9,7 +9,7 @@ import {
 } from '../controllers/sourceDirectoryController'
 import { basicAuth } from '../middleware/auth'
 
-const router = Router()
+const router: Router = Router()
 
 router.get('/', basicAuth, getAllSourceDirectories)
 router.get('/:id', basicAuth, getSourceDirectory)

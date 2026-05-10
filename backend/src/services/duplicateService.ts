@@ -9,7 +9,7 @@ export async function findDuplicates(hash: string): Promise<Array<{ id: string; 
   return duplicates
 }
 
-export async function checkForDuplicate(filePath: string): Promise<{ exists: boolean; media?: { id: string; filepath: string } }> {
+export async function checkForDuplicate(filePath: string): Promise<{ exists: boolean; media: { id: string; filepath: string } | null }> {
   const hash = await calculateFileHash(filePath)
   const existing = await prisma.media.findFirst({
     where: { hash },
@@ -22,7 +22,7 @@ export async function checkForDuplicate(filePath: string): Promise<{ exists: boo
   }
 }
 
-export async function getAllDuplicates(): Promise<Array<{ hash: string; count: number; medias: Array<{ id: string; filepath: string }> }>> {
+export async function getAllDuplicates(): Promise<Array<{ hash: string | null; count: number; medias: Array<{ id: string; filepath: string }> }>> {
   const duplicates = await prisma.media.groupBy({
     by: ['hash'],
     _count: { id: true },

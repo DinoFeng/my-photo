@@ -6,7 +6,7 @@ import {
 } from '../controllers/mediaController'
 import { basicAuth } from '../middleware/auth'
 
-const router = Router()
+const router: Router = Router()
 
 router.get('/', basicAuth, getAllMedia)
 router.get('/:id', basicAuth, getMediaById)

@@ -43,6 +43,8 @@ export async function processImport(importPath: string, sourceDirectoryId: strin
 
     fs.copyFileSync(sourceFilePath, targetFilePath)
 
+    const { metadata: rawMetadata, ...mediaData } = metadata
+
     await prisma.media.create({
       data: {
         sourceDirectoryId,
@@ -51,7 +53,8 @@ export async function processImport(importPath: string, sourceDirectoryId: strin
         fileSize: BigInt(stat.size),
         fileType,
         hash,
-        ...metadata
+        ...mediaData,
+        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined
       }
     })
 

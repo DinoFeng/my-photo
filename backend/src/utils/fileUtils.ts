@@ -52,8 +52,14 @@ export async function getFileMetadata(filePath: string): Promise<{
     }
 
     if (tags['GPSLatitude'] && tags['GPSLongitude']) {
-      result.latitude = gpsToDecimal(tags['GPSLatitude'].value, tags['GPSLatitudeRef']?.value)
-      result.longitude = gpsToDecimal(tags['GPSLongitude'].value, tags['GPSLongitudeRef']?.value)
+      const latValue = tags['GPSLatitude'].value
+      const lngValue = tags['GPSLongitude'].value
+      const latRef = typeof tags['GPSLatitudeRef']?.value === 'string' ? tags['GPSLatitudeRef'].value : undefined
+      const lngRef = typeof tags['GPSLongitudeRef']?.value === 'string' ? tags['GPSLongitudeRef'].value : undefined
+      if (Array.isArray(latValue) && Array.isArray(lngValue) && latValue.every(v => typeof v === 'number') && lngValue.every(v => typeof v === 'number')) {
+        result.latitude = gpsToDecimal(latValue as unknown as number[], latRef)
+        result.longitude = gpsToDecimal(lngValue as unknown as number[], lngRef)
+      }
     }
 
     result.metadata = Object.fromEntries(

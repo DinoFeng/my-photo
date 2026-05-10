@@ -5,7 +5,7 @@ import scanCheckpointRoutes from './scanCheckpointRoutes'
 import settingRoutes from './settingRoutes'
 import exportRoutes from './exportRoutes'
 
-const router = Router()
+const router: Router = Router()
 
 router.use('/source-dirs', sourceDirRoutes)
 router.use('/media', mediaRoutes)

@@ -6,7 +6,7 @@ import {
 } from '../controllers/scanCheckpointController'
 import { basicAuth } from '../middleware/auth'
 
-const router = Router()
+const router: Router = Router()
 
 router.get('/', basicAuth, getAllScanCheckpoints)
 router.get('/:sourceDirectoryId', basicAuth, getScanCheckpoint)

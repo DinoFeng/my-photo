@@ -49,6 +49,8 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
         const metadata = await getFileMetadata(filePath)
         const fileType = getFileType(filePath)
 
+        const { metadata: rawMetadata, ...mediaData } = metadata
+
         await prisma.media.upsert({
           where: {
             sourceDirectoryId_filepath: {
@@ -61,17 +63,19 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
             fileSize: BigInt(stat.size),
             fileType,
             hash,
-            ...metadata,
+            ...mediaData,
+            metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
             updatedAt: new Date()
           },
           create: {
             sourceDirectoryId,
             filename: filePath.split('\\').pop() || filePath.split('/').pop() || '',
-            filepath,
+            filepath: filePath,
             fileSize: BigInt(stat.size),
             fileType,
             hash,
-            ...metadata
+            ...mediaData,
+            metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined
           }
         })
       } catch {
