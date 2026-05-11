@@ -1,17 +1,16 @@
 import express, { Express } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { PrismaClient } from '@prisma/client'
+import { db as drizzleDb } from './db'
 import apiRoutes from './routes'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 import { accessLogger, errorLogger } from './middleware/logger'
 
-// 导入消费者注册模块（确保消费者在应用启动时被注册）
 import './services/queueConsumers'
 
 dotenv.config()
 
-export const prisma = new PrismaClient()
+export const prisma = drizzleDb
 
 const app: Express = express()
 const PORT = process.env.PORT || 3000

@@ -1,45 +1,55 @@
-import { prisma } from '../server'
+import { db } from '../db'
+import { sourceDirectory, media, scanCheckpoint } from '../db/schema'
+import { eq, and } from 'drizzle-orm'
 import { scanDirectory, calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils'
 import fs from 'fs'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function startScan(sourceDirectoryId: string): Promise<void> {
-  const sourceDir = await prisma.sourceDirectory.findUnique({
-    where: { id: sourceDirectoryId }
-  })
+  const result = await db.select().from(sourceDirectory).where(eq(sourceDirectory.id, sourceDirectoryId))
+  const sourceDir = result[0]
 
   if (!sourceDir) {
     throw new Error('Source directory not found')
   }
 
-  await prisma.scanCheckpoint.upsert({
-    where: { sourceDirectoryId },
-    update: {
+  const now = new Date().toISOString()
+  const checkpointResult = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+  const existingCheckpoint = checkpointResult[0]
+
+  if (existingCheckpoint) {
+    await db.update(scanCheckpoint).set({
       status: 'scanning',
       progress: 0,
       totalFiles: 0,
       scannedFiles: 0,
       errorCount: 0,
-      startedAt: new Date(),
-      completedAt: null
-    },
-    create: {
+      startedAt: now,
+      completedAt: null,
+      updatedAt: now
+    }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+  } else {
+    await db.insert(scanCheckpoint).values({
+      id: uuidv4(),
       sourceDirectoryId,
       status: 'scanning',
       progress: 0,
       totalFiles: 0,
       scannedFiles: 0,
       errorCount: 0,
-      startedAt: new Date()
-    }
-  })
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now
+    })
+  }
 
   try {
     const files = await scanDirectory(sourceDir.path)
     
-    await prisma.scanCheckpoint.update({
-      where: { sourceDirectoryId },
-      data: { totalFiles: files.length }
-    })
+    await db.update(scanCheckpoint).set({ 
+      totalFiles: files.length,
+      updatedAt: new Date().toISOString()
+    }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
 
     let scannedCount = 0
     for (const filePath of files) {
@@ -51,75 +61,83 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
 
         const { metadata: rawMetadata, ...mediaData } = metadata
 
-        await prisma.media.upsert({
-          where: {
-            sourceDirectoryId_filepath: {
-              sourceDirectoryId,
-              filepath: filePath
-            }
-          },
-          update: {
-            filename: filePath.split('\\').pop() || filePath.split('/').pop() || '',
-            fileSize: BigInt(stat.size),
+        const existingMediaResult = await db.select().from(media)
+          .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirectoryId)))
+        const existingMedia = existingMediaResult[0]
+
+        const currentNow = new Date().toISOString()
+        const filename = filePath.split('\\').pop() || filePath.split('/').pop() || ''
+
+        const processedMediaData = {
+          ...mediaData,
+          dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
+        }
+
+        if (existingMedia) {
+          await db.update(media).set({
+            filename,
+            fileSize: stat.size,
             fileType,
             hash,
-            ...mediaData,
+            ...processedMediaData,
             metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
-            updatedAt: new Date()
-          },
-          create: {
+            updatedAt: currentNow
+          }).where(eq(media.id, existingMedia.id))
+        } else {
+          await db.insert(media).values({
+            id: uuidv4(),
             sourceDirectoryId,
-            filename: filePath.split('\\').pop() || filePath.split('/').pop() || '',
+            filename,
             filepath: filePath,
-            fileSize: BigInt(stat.size),
+            fileSize: stat.size,
             fileType,
             hash,
-            ...mediaData,
-            metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined
-          }
-        })
+            ...processedMediaData,
+            createdAt: currentNow,
+            updatedAt: currentNow
+          })
+        }
       } catch {
-        await prisma.scanCheckpoint.update({
-          where: { sourceDirectoryId },
-          data: { errorCount: { increment: 1 } }
-        })
+        const checkpointRes = await db.select({ errorCount: scanCheckpoint.errorCount }).from(scanCheckpoint)
+          .where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+        const currentErrorCount = checkpointRes[0]?.errorCount || 0
+        await db.update(scanCheckpoint).set({ 
+          errorCount: currentErrorCount + 1,
+          updatedAt: new Date().toISOString()
+        }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
       }
 
       scannedCount++
       const progress = Math.round((scannedCount / files.length) * 100)
-      await prisma.scanCheckpoint.update({
-        where: { sourceDirectoryId },
-        data: { scannedFiles: scannedCount, progress }
-      })
+      await db.update(scanCheckpoint).set({ 
+        scannedFiles: scannedCount, 
+        progress,
+        updatedAt: new Date().toISOString()
+      }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
     }
 
-    await prisma.sourceDirectory.update({
-      where: { id: sourceDirectoryId },
-      data: { lastScanned: new Date() }
-    })
+    await db.update(sourceDirectory).set({ 
+      lastScanned: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }).where(eq(sourceDirectory.id, sourceDirectoryId))
 
-    await prisma.scanCheckpoint.update({
-      where: { sourceDirectoryId },
-      data: {
-        status: 'completed',
-        progress: 100,
-        completedAt: new Date()
-      }
-    })
+    await db.update(scanCheckpoint).set({
+      status: 'completed',
+      progress: 100,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
   } catch (error) {
-    await prisma.scanCheckpoint.update({
-      where: { sourceDirectoryId },
-      data: {
-        status: 'failed',
-        completedAt: new Date()
-      }
-    })
+    await db.update(scanCheckpoint).set({
+      status: 'failed',
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
     throw error
   }
 }
 
 export async function getScanStatus(sourceDirectoryId: string) {
-  return prisma.scanCheckpoint.findUnique({
-    where: { sourceDirectoryId }
-  })
+  const result = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+  return result[0]
 }

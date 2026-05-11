@@ -1,8 +1,11 @@
 import chokidar from 'chokidar';
-import { prisma } from '../server';
+import { db } from '../db';
+import { sourceDirectory, media } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
 import { calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils';
 import fs from 'fs';
 import { queueService } from './queueService';
+import { v4 as uuidv4 } from 'uuid';
 
 interface WatcherInstance {
   watcher: chokidar.FSWatcher;
@@ -34,34 +37,42 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
       const metadata = await getFileMetadata(filePath);
       const fileType = getFileType(filePath);
       const { metadata: rawMetadata, ...mediaData } = metadata;
+      const now = new Date().toISOString();
 
-      await prisma.media.upsert({
-        where: {
-          sourceDirectoryId_filepath: {
-            sourceDirectoryId: sourceDirId,
-            filepath: filePath
-          }
-        },
-        update: {
-          filename: filePath.split('\\').pop() || filePath.split('/').pop() || '',
-          fileSize: BigInt(stat.size),
+      const existingMediaResult = await db.select().from(media)
+        .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirId)))
+      const existingMedia = existingMediaResult[0];
+      const filename = filePath.split('\\').pop() || filePath.split('/').pop() || '';
+
+      const processedMediaData = {
+        ...mediaData,
+        dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
+      };
+
+      if (existingMedia) {
+        await db.update(media).set({
+          filename,
+          fileSize: stat.size,
           fileType,
           hash,
-          ...mediaData,
+          ...processedMediaData,
           metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
-          updatedAt: new Date()
-        },
-        create: {
+          updatedAt: now
+        }).where(eq(media.id, existingMedia.id));
+      } else {
+        await db.insert(media).values({
+          id: uuidv4(),
           sourceDirectoryId: sourceDirId,
-          filename: filePath.split('\\').pop() || filePath.split('/').pop() || '',
+          filename,
           filepath: filePath,
-          fileSize: BigInt(stat.size),
+          fileSize: stat.size,
           fileType,
           hash,
-          ...mediaData,
-          metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined
-        }
-      });
+          ...processedMediaData,
+          createdAt: now,
+          updatedAt: now
+        });
+      }
     } catch (error) {
       console.error('Error processing added file:', error);
     }
@@ -73,20 +84,20 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
       const hash = await calculateFileHash(filePath);
       const metadata = await getFileMetadata(filePath);
       const { metadata: rawMetadata, ...mediaData } = metadata;
+      const now = new Date().toISOString();
 
-      await prisma.media.updateMany({
-        where: {
-          sourceDirectoryId: sourceDirId,
-          filepath: filePath
-        },
-        data: {
-          fileSize: BigInt(stat.size),
-          hash,
-          ...mediaData,
-          metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
-          updatedAt: new Date()
-        }
-      });
+      const processedMediaData = {
+        ...mediaData,
+        dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
+      };
+
+      await db.update(media).set({
+        fileSize: stat.size,
+        hash,
+        ...processedMediaData,
+        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
+        updatedAt: now
+      }).where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.filepath, filePath)));
     } catch (error) {
       console.error('Error processing changed file:', error);
     }
@@ -94,16 +105,10 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
 
   watcher.on('unlink', async (filePath: string) => {
     try {
-      await prisma.media.updateMany({
-        where: {
-          sourceDirectoryId: sourceDirId,
-          filepath: filePath
-        },
-        data: {
-          status: 'removed',
-          updatedAt: new Date()
-        }
-      });
+      await db.update(media).set({
+        status: 'removed',
+        updatedAt: new Date().toISOString()
+      }).where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.filepath, filePath)));
     } catch (error) {
       console.error('Error processing removed file:', error);
     }
@@ -187,9 +192,7 @@ export async function restartAllWatchers(): Promise<void> {
 }
 
 export async function startWatchersForAllSourceDirs(): Promise<void> {
-  const dirs = await prisma.sourceDirectory.findMany({
-    where: { enabled: true }
-  });
+  const dirs = await db.select().from(sourceDirectory).where(eq(sourceDirectory.enabled, true));
 
   for (const dir of dirs) {
     try {

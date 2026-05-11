@@ -1,12 +1,14 @@
 import fs from 'fs'
 import path from 'path'
-import { prisma } from '../server'
+import { db } from '../db'
+import { sourceDirectory, media } from '../db/schema'
+import { eq } from 'drizzle-orm'
 import { calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function processImport(importPath: string, sourceDirectoryId: string): Promise<void> {
-  const sourceDir = await prisma.sourceDirectory.findUnique({
-    where: { id: sourceDirectoryId }
-  })
+  const result = await db.select().from(sourceDirectory).where(eq(sourceDirectory.id, sourceDirectoryId))
+  const sourceDir = result[0]
 
   if (!sourceDir) {
     throw new Error('Source directory not found')
@@ -21,9 +23,8 @@ export async function processImport(importPath: string, sourceDirectoryId: strin
     const sourceFilePath = path.join(importPath, filename)
     const hash = await calculateFileHash(sourceFilePath)
     
-    const existingMedia = await prisma.media.findFirst({
-      where: { hash }
-    })
+    const existingMediaResult = await db.select().from(media).where(eq(media.hash, hash))
+    const existingMedia = existingMediaResult[0]
 
     if (existingMedia) {
       continue
@@ -44,18 +45,24 @@ export async function processImport(importPath: string, sourceDirectoryId: strin
     fs.copyFileSync(sourceFilePath, targetFilePath)
 
     const { metadata: rawMetadata, ...mediaData } = metadata
+    const now = new Date().toISOString()
 
-    await prisma.media.create({
-      data: {
-        sourceDirectoryId,
-        filename: newFilename,
-        filepath: targetFilePath,
-        fileSize: BigInt(stat.size),
-        fileType,
-        hash,
-        ...mediaData,
-        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined
-      }
+    const processedMediaData = {
+      ...mediaData,
+      dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
+    }
+
+    await db.insert(media).values({
+      id: uuidv4(),
+      sourceDirectoryId,
+      filename: newFilename,
+      filepath: targetFilePath,
+      fileSize: stat.size,
+      fileType,
+      hash,
+      ...processedMediaData,
+      createdAt: now,
+      updatedAt: now
     })
 
     fs.unlinkSync(sourceFilePath)

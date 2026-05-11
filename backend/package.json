@@ -7,26 +7,29 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0",
+    "@libsql/client": "^0.17.3",
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
+    "drizzle-orm": "^0.45.2",
     "exifreader": "^4.15.0",
     "express": "^4.18.2",
     "queue-manager-pro": "^1.0.0",
-    "sharp": "^0.33.2"
+    "sharp": "^0.33.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
-    "prisma": "^5.10.0",
+    "@types/uuid": "^9.0.0",
+    "drizzle-kit": "^0.31.10",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^6.0.3"
+    "typescript": "^5.5.4"
   }
 }
