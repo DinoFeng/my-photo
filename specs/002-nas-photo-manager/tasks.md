@@ -11,9 +11,9 @@
 
 - [x] T001 Create backend directory structure with package.json and tsconfig.json
 - [x] T002 Create frontend directory structure with Vue 3 + Vite + TypeScript
-- [ ] T003 Install backend dependencies: express, prisma, @prisma/client, chokidar, queue-manager-pro, sharp, exifreader, cors, dotenv
-- [ ] T004 Install frontend dependencies: vue, @vueuse/core, naive-ui, lucide-vue-next, pinia, vue-router, vue-i18n
-- [ ] T005 Initialize Prisma with SQLite database
+- [x] T003 Install backend dependencies: express, prisma, @prisma/client, chokidar, queue-manager-pro, sharp, exifreader, cors, dotenv
+- [x] T004 Install frontend dependencies: vue, @vueuse/core, naive-ui, lucide-vue-next, pinia, vue-router, vue-i18n
+- [x] T005 Initialize Prisma with SQLite database
 - [x] T006 Create .env.example with all environment variables
 - [x] T007 Create docker/ directory with Dockerfile and docker-compose.yml
 
@@ -26,7 +26,7 @@
 - [x] T012 [P] Create file utilities for scanning, hash calculation, metadata extraction
 - [x] T013 [P] Create Vue 3 app with Pinia store and Vue Router
 - [x] T014 [P] Create i18n configuration with Chinese and English locales
-- [ ] T015 Run Prisma generate and db push to initialize database
+- [x] T015 Run Prisma generate and db push to initialize database
 
 ## Phase 3: User Story 1 - 添加并扫描照片源目录 (P1)
 
@@ -47,7 +47,7 @@
 - [x] T021 [US1] Create Vue page for source directory management
 - [x] T022 [US1] Create Vue component for scan progress display
 - [x] T023 [US1] Create Pinia store for source directories and scan status
-- [ ] T024 [US1] Integrate file watcher (chokidar) for source directory changes
+- [x] T024 [US1] Integrate file watcher (chokidar) for source directory changes
 
 ## Phase 4: User Story 2 - 从导入目录整理照片 (P1)
 
@@ -65,9 +65,9 @@
 - [x] T027 [US2] Create duplicate detection service with SHA256 hash
 - [x] T028 [US2] Create routes for settings and import API endpoints
 - [x] T029 [US2] Create Vue page for settings management
-- [ ] T030 [US2] Create Vue component for import task status
+- [x] T030 [US2] Create Vue component for import task status
 - [x] T031 [US2] Create Pinia store for settings and import tasks
-- [ ] T032 [US2] Integrate file watcher for import directory monitoring
+- [x] T032 [US2] Integrate file watcher for import directory monitoring
 
 ## Phase 5: User Story 3 - 浏览和搜索照片 (P2)
 
@@ -83,7 +83,7 @@
 - [x] T033 [US3] Create Media controller with pagination, filtering and search
 - [x] T034 [US3] Create thumbnail generation service using Sharp
 - [x] T035 [US3] Create Vue page for photo gallery with grid layout
-- [ ] T036 [US3] Create Vue component for photo detail view
+- [x] T036 [US3] Create Vue component for photo detail view
 - [x] T037 [US3] Create Vue component for search and filter
 - [x] T038 [US3] Create Pinia store for media browsing state
 
@@ -100,22 +100,22 @@
 - [x] T039 [US4] Create ExportService with organize pattern support
 - [x] T040 [US4] Create Export controller with batch export endpoints
 - [x] T041 [US4] Create routes for export API endpoints
-- [ ] T042 [US4] Create Vue component for export dialog
-- [ ] T043 [US4] Create Vue component for export progress
-- [ ] T044 [US4] Create Pinia store for export tasks
+- [x] T042 [US4] Create Vue component for export dialog
+- [x] T043 [US4] Create Vue component for export progress
+- [x] T044 [US4] Create Pinia store for export tasks
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [x] T045 Create error handling middleware for Express
 - [x] T046 Create health check endpoint
-- [ ] T047 Create watch status endpoint for monitoring services
-- [ ] T048 Add responsive design to Vue components
+- [x] T047 Create watch status endpoint for monitoring services
+- [x] T048 Add responsive design to Vue components
 - [x] T049 Add loading states and error messages to UI
-- [ ] T050 Create global error handling in Vue
-- [ ] T051 Optimize frontend bundle size with code splitting
+- [x] T050 Create global error handling in Vue
+- [x] T051 Optimize frontend bundle size with code splitting
 - [x] T052 Update docker-compose.yml with resource limits
-- [ ] T053 Update quickstart.md with deployment instructions
-- [ ] T054 Add logging middleware for production
+- [x] T053 Update quickstart.md with deployment instructions
+- [x] T054 Add logging middleware for production
 
 ## Phase 8: Security Phase 2 - JWT Authentication (后续阶段)
 
@@ -166,11 +166,11 @@ Phase 1 ─┬─→ Phase 2 ─┬─→ Phase 3 (US1)
 
 | User Story | Task Count | Completed | Priority |
 |------------|------------|-----------|----------|
-| Setup | 7 | 3 | - |
-| Foundational | 8 | 7 | - |
-| US1 - 添加并扫描照片源目录 | 8 | 8 | P1 |
-| US2 - 从导入目录整理照片 | 8 | 5 | P1 |
-| US3 - 浏览和搜索照片 | 6 | 5 | P2 |
-| US4 - 导出和整理照片 | 6 | 3 | P3 |
-| Polish | 12 | 3 | - |
-| **Total** | **55** | **34** | |
+| Setup | 7 | 7 | - |
+| Foundational | 8 | 8 | - |
+| US1 - 添加并扫描照片源目录 | 9 | 9 | P1 |
+| US2 - 从导入目录整理照片 | 8 | 8 | P1 |
+| US3 - 浏览和搜索照片 | 6 | 6 | P2 |
+| US4 - 导出和整理照片 | 6 | 6 | P3 |
+| Polish | 12 | 12 | - |
+| **Total** | **56** | **56** | **100%** |

@@ -4,6 +4,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import routes from './routes'
+import { setupErrorHandler } from './utils/errorHandler'
+import './styles/responsive.css'
 
 const i18n = createI18n({
   legacy: false,
@@ -85,5 +87,6 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+setupErrorHandler(app)
 
 app.mount('#app')
