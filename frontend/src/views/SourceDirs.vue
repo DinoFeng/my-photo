@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Plus, RefreshCw, Edit3, Trash2, Folder } from 'lucide-vue-next'
 import { useSourceDirStore } from '../stores/sourceDirStore'
@@ -96,9 +96,24 @@ const formData = ref({ name: '', path: '' })
 
 const directories = sourceDirStore.directories
 
+const checkAndConnectSSE = async () => {
+  for (const dir of sourceDirStore.directories) {
+    if (dir.scanCheckpoint?.status === 'scanning') {
+      sourceDirStore.connectSSE(dir.id)
+    } else {
+      sourceDirStore.disconnectSSE(dir.id)
+    }
+  }
+}
+
 onMounted(async () => {
   await sourceDirStore.loadDirectories()
   loading.value = false
+  await checkAndConnectSSE()
+})
+
+onUnmounted(() => {
+  sourceDirStore.disconnectAllSSE()
 })
 
 const getStatusClass = (dir: typeof directories[0]) => {
@@ -123,6 +138,8 @@ const formatDate = (date?: string) => {
 
 const startScan = async (id: string) => {
   await sourceDirStore.startScan(id)
+  await sourceDirStore.loadDirectories()
+  sourceDirStore.connectSSE(id)
 }
 
 const editDirectory = (dir: typeof directories[0]) => {
@@ -142,7 +159,12 @@ const saveDirectory = async () => {
   if (editingDirectory.value) {
     await sourceDirStore.updateDirectory(editingDirectory.value.id, formData.value)
   } else {
-    await sourceDirStore.createDirectory(formData.value)
+    const newDir = await sourceDirStore.createDirectory(formData.value)
+    if (newDir) {
+      await sourceDirStore.startScan(newDir.id)
+      await sourceDirStore.loadDirectories()
+      sourceDirStore.connectSSE(newDir.id)
+    }
   }
   closeModal()
 }

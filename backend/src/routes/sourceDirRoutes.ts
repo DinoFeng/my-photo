@@ -2,20 +2,22 @@ import { Router } from 'express'
 import {
   getAllSourceDirectories,
   getSourceDirectory,
-  createSourceDirectory,
-  updateSourceDirectory,
-  deleteSourceDirectory,
-  triggerScan
+  createSourceDirectoryHandler,
+  updateSourceDirectoryHandler,
+  deleteSourceDirectoryHandler,
+  triggerScanHandler,
+  getScanProgress
 } from '../controllers/sourceDirectoryController'
-import { basicAuth } from '../middleware/auth'
+import { basicAuth } from '../middleware/authMiddleware'
 
 const router: Router = Router()
 
 router.get('/', basicAuth, getAllSourceDirectories)
 router.get('/:id', basicAuth, getSourceDirectory)
-router.post('/', basicAuth, createSourceDirectory)
-router.put('/:id', basicAuth, updateSourceDirectory)
-router.delete('/:id', basicAuth, deleteSourceDirectory)
-router.post('/:id/scan', basicAuth, triggerScan)
+router.post('/', basicAuth, createSourceDirectoryHandler)
+router.put('/:id', basicAuth, updateSourceDirectoryHandler)
+router.delete('/:id', basicAuth, deleteSourceDirectoryHandler)
+router.post('/:id/scan', basicAuth, triggerScanHandler)
+router.get('/:id/scan-progress', basicAuth, getScanProgress)
 
 export default router

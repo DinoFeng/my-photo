@@ -1,10 +1,10 @@
 import { Request, Response } from 'express'
-import { queueService } from '../services/queueService'
+import { queue } from '../utils/queue'
 
 export async function batchExport(req: Request, res: Response) {
   try {
     const { mediaIds, exportPath, organizePattern } = req.body
-    const taskId = await queueService.enqueue('export', { mediaIds, exportPath, organizePattern })
+    const taskId = await queue.enqueue('export', { mediaIds, exportPath, organizePattern })
     res.json({ message: 'Export started', taskId })
   } catch (error) {
     res.status(500).json({ error: 'Failed to start export' })

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { apiClient, sseRequest } from '../utils/apiClient'
 
 export interface SourceDirectory {
   id: string
@@ -20,48 +21,30 @@ export interface SourceDirectory {
 
 export const useSourceDirStore = defineStore('sourceDir', () => {
   const directories = ref<SourceDirectory[]>([])
+  const sseAbortControllers = ref<Map<string, AbortController>>(new Map())
 
   const loadDirectories = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/source-dirs', {
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
-      directories.value = await response.json()
+      directories.value = await apiClient.get<SourceDirectory[]>('/api/source-dirs')
     } catch (error) {
       console.error('Failed to load directories:', error)
     }
   }
 
-  const createDirectory = async (data: { name: string; path: string }) => {
+  const createDirectory = async (data: { name: string; path: string }): Promise<SourceDirectory | undefined> => {
     try {
-      const response = await fetch('http://localhost:3000/api/source-dirs', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password'),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      })
-      const newDir = await response.json()
+      const newDir = await apiClient.post<SourceDirectory>('/api/source-dirs', data)
       directories.value.push(newDir)
+      return newDir
     } catch (error) {
       console.error('Failed to create directory:', error)
+      return undefined
     }
   }
 
   const updateDirectory = async (id: string, data: { name: string; path: string }) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/source-dirs/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password'),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      })
-      const updatedDir = await response.json()
+      const updatedDir = await apiClient.put<SourceDirectory>(`/api/source-dirs/${id}`, data)
       const index = directories.value.findIndex(d => d.id === id)
       if (index !== -1) {
         directories.value[index] = updatedDir
@@ -73,13 +56,9 @@ export const useSourceDirStore = defineStore('sourceDir', () => {
 
   const deleteDirectory = async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/source-dirs/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
+      await apiClient.delete(`/api/source-dirs/${id}`)
       directories.value = directories.value.filter(d => d.id !== id)
+      disconnectSSE(id)
     } catch (error) {
       console.error('Failed to delete directory:', error)
     }
@@ -87,16 +66,46 @@ export const useSourceDirStore = defineStore('sourceDir', () => {
 
   const startScan = async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/source-dirs/${id}/scan`, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
-      await loadDirectories()
+      await apiClient.post(`/api/source-dirs/${id}/scan`)
     } catch (error) {
       console.error('Failed to start scan:', error)
     }
+  }
+
+  const connectSSE = async (sourceDirectoryId: string) => {
+    if (sseAbortControllers.value.has(sourceDirectoryId)) return
+    
+    const controller = new AbortController()
+    sseAbortControllers.value.set(sourceDirectoryId, controller)
+    
+    try {
+      await sseRequest(
+        `/api/sse/scan-progress/${sourceDirectoryId}`,
+        {
+          progress: async () => {
+            await loadDirectories()
+          }
+        },
+        controller.signal
+      )
+    } catch {
+      // Connection closed or error
+    } finally {
+      sseAbortControllers.value.delete(sourceDirectoryId)
+    }
+  }
+
+  const disconnectSSE = (sourceDirectoryId: string) => {
+    const controller = sseAbortControllers.value.get(sourceDirectoryId)
+    if (controller) {
+      controller.abort()
+      sseAbortControllers.value.delete(sourceDirectoryId)
+    }
+  }
+
+  const disconnectAllSSE = () => {
+    sseAbortControllers.value.forEach(controller => controller.abort())
+    sseAbortControllers.value.clear()
   }
 
   return {
@@ -105,6 +114,9 @@ export const useSourceDirStore = defineStore('sourceDir', () => {
     createDirectory,
     updateDirectory,
     deleteDirectory,
-    startScan
+    startScan,
+    connectSSE,
+    disconnectSSE,
+    disconnectAllSSE
   }
 })

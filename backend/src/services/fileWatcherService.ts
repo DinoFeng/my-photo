@@ -4,7 +4,7 @@ import { sourceDirectory, media } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils';
 import fs from 'fs';
-import { queueService } from './queueService';
+import { queue } from '../utils/queue';
 import { v4 as uuidv4 } from 'uuid';
 
 interface WatcherInstance {
@@ -141,7 +141,7 @@ export async function startImportDirWatcher(importPath: string): Promise<void> {
 
   watcher.on('add', async (filePath: string) => {
     try {
-      await queueService.enqueue('import-file', { filePath });
+      await queue.enqueue('import-file', { filePath });
     } catch (error) {
       console.error('Error queueing import file:', error);
     }

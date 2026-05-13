@@ -1,12 +1,15 @@
 import { Request, Response } from 'express'
-import { db } from '../db'
-import { setting } from '../db/schema'
-import { eq } from 'drizzle-orm'
-import { v4 as uuidv4 } from 'uuid'
+import {
+  findAllSettings,
+  findSettingByKey,
+  createSetting,
+  updateSetting,
+  deleteSetting
+} from '../services/settingService'
 
 export async function getAllSettings(req: Request, res: Response) {
   try {
-    const settings = await db.select().from(setting)
+    const settings = await findAllSettings()
     res.json(settings)
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch settings' })
@@ -16,8 +19,8 @@ export async function getAllSettings(req: Request, res: Response) {
 export async function getSetting(req: Request, res: Response) {
   try {
     const { key } = req.params
-    const result = await db.select().from(setting).where(eq(setting.key, key))
-    const settingItem = result[0]
+    const settingItem = await findSettingByKey(key)
+    
     if (!settingItem) {
       return res.status(404).json({ error: 'Setting not found' })
     }
@@ -27,47 +30,38 @@ export async function getSetting(req: Request, res: Response) {
   }
 }
 
-export async function createSetting(req: Request, res: Response) {
+export async function createSettingHandler(req: Request, res: Response) {
   try {
     const { key, value, description } = req.body
-    const now = new Date().toISOString()
-    const result = await db.insert(setting).values({
-      id: uuidv4(),
-      key,
-      value,
-      description,
-      createdAt: now,
-      updatedAt: now
-    }).returning()
-    res.status(201).json(result[0])
+    const settingItem = await createSetting({ key, value, description })
+    res.status(201).json(settingItem)
   } catch (error) {
     res.status(500).json({ error: 'Failed to create setting' })
   }
 }
 
-export async function updateSetting(req: Request, res: Response) {
+export async function updateSettingHandler(req: Request, res: Response) {
   try {
     const { key } = req.params
     const { value, description } = req.body
-    const result = await db.update(setting).set({
-      value,
-      description,
-      updatedAt: new Date().toISOString()
-    }).where(eq(setting.key, key)).returning()
-    if (result.length === 0) {
+    
+    const updated = await updateSetting(key, { value, description })
+    
+    if (!updated) {
       return res.status(404).json({ error: 'Setting not found' })
     }
-    res.json(result[0])
+    res.json(updated)
   } catch (error) {
     res.status(500).json({ error: 'Failed to update setting' })
   }
 }
 
-export async function deleteSetting(req: Request, res: Response) {
+export async function deleteSettingHandler(req: Request, res: Response) {
   try {
     const { key } = req.params
-    const result = await db.delete(setting).where(eq(setting.key, key)).returning()
-    if (result.length === 0) {
+    const deleted = await deleteSetting(key)
+    
+    if (!deleted) {
       return res.status(404).json({ error: 'Setting not found' })
     }
     res.status(204).send()

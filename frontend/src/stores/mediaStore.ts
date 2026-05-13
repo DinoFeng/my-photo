@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { apiClient, sseRequest } from '../utils/apiClient'
 
 export interface Media {
   id: string
@@ -13,12 +14,21 @@ export interface Media {
   sourceDirectoryId: string
 }
 
+interface MediaResponse {
+  data: Media[]
+  pagination: {
+    page: number
+    pages: number
+  }
+}
+
 export const useMediaStore = defineStore('media', () => {
   const mediaList = ref<Media[]>([])
   const loading = ref(false)
   const searchQuery = ref('')
   const currentPage = ref(1)
   const totalPages = ref(1)
+  const sseAbortController = ref<AbortController | null>(null)
 
   const filteredMedia = computed(() => {
     if (!searchQuery.value) return mediaList.value
@@ -38,12 +48,7 @@ export const useMediaStore = defineStore('media', () => {
         params.set('search', search)
       }
 
-      const response = await fetch(`http://localhost:3000/api/media?${params}`, {
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
-      const data = await response.json()
+      const data = await apiClient.get<MediaResponse>(`/api/media?${params}`)
       mediaList.value = data.data
       currentPage.value = data.pagination.page
       totalPages.value = data.pagination.pages
@@ -53,14 +58,22 @@ export const useMediaStore = defineStore('media', () => {
     loading.value = false
   }
 
+  const addMedia = (mediaItem: Media) => {
+    const existingIndex = mediaList.value.findIndex(m => m.id === mediaItem.id)
+    if (existingIndex >= 0) {
+      mediaList.value[existingIndex] = mediaItem
+    } else {
+      mediaList.value.unshift(mediaItem)
+    }
+  }
+
+  const addMediaList = (mediaItems: Media[]) => {
+    mediaItems.forEach(item => addMedia(item))
+  }
+
   const deleteMedia = async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/media/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
+      await apiClient.delete(`/api/media/${id}`)
       mediaList.value = mediaList.value.filter(m => m.id !== id)
     } catch (error) {
       console.error('Failed to delete media:', error)
@@ -72,6 +85,39 @@ export const useMediaStore = defineStore('media', () => {
     currentPage.value = 1
   }
 
+  const connectMediaSSE = async () => {
+    if (sseAbortController.value) return
+    
+    const controller = new AbortController()
+    sseAbortController.value = controller
+    
+    try {
+      await sseRequest(
+        '/api/sse/media-updates',
+        {
+          'media-added': (mediaItem: Media) => {
+            addMedia(mediaItem)
+          },
+          'media-list': (mediaItems: Media[]) => {
+            addMediaList(mediaItems)
+          }
+        },
+        controller.signal
+      )
+    } catch {
+      // Connection closed or error
+    } finally {
+      sseAbortController.value = null
+    }
+  }
+
+  const disconnectMediaSSE = () => {
+    if (sseAbortController.value) {
+      sseAbortController.value.abort()
+      sseAbortController.value = null
+    }
+  }
+
   return {
     mediaList,
     loading,
@@ -80,7 +126,11 @@ export const useMediaStore = defineStore('media', () => {
     totalPages,
     filteredMedia,
     loadMedia,
+    addMedia,
+    addMediaList,
     deleteMedia,
-    setSearchQuery
+    setSearchQuery,
+    connectMediaSSE,
+    disconnectMediaSSE
   }
 })

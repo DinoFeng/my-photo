@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm'
 import { scanDirectory, calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils'
 import fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
+import { eventBus } from '../utils/eventBus'
 
 export async function startScan(sourceDirectoryId: string): Promise<void> {
   const result = await db.select().from(sourceDirectory).where(eq(sourceDirectory.id, sourceDirectoryId))
@@ -42,6 +43,9 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
       updatedAt: now
     })
   }
+  
+  const updatedCheckpoint = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+  await eventBus.emit('scanProgressUpdated', { sourceDirectoryId, checkpoint: updatedCheckpoint[0] })
 
   try {
     const files = await scanDirectory(sourceDir.path)
@@ -83,9 +87,13 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
             metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
             updatedAt: currentNow
           }).where(eq(media.id, existingMedia.id))
+          
+          const updatedMedia = { ...existingMedia, filename, fileSize: stat.size, fileType, hash, ...processedMediaData, updatedAt: currentNow }
+          await eventBus.emit('mediaAdded', { sourceDirectoryId, mediaItem: updatedMedia })
         } else {
-          await db.insert(media).values({
-            id: uuidv4(),
+          const newMediaId = uuidv4()
+          const newMediaItem = {
+            id: newMediaId,
             sourceDirectoryId,
             filename,
             filepath: filePath,
@@ -95,7 +103,10 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
             ...processedMediaData,
             createdAt: currentNow,
             updatedAt: currentNow
-          })
+          }
+          await db.insert(media).values(newMediaItem)
+          
+          await eventBus.emit('mediaAdded', { sourceDirectoryId, mediaItem: newMediaItem })
         }
       } catch {
         const checkpointRes = await db.select({ errorCount: scanCheckpoint.errorCount }).from(scanCheckpoint)
@@ -114,6 +125,9 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
         progress,
         updatedAt: new Date().toISOString()
       }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+      
+      const checkpointAfterUpdate = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+      await eventBus.emit('scanProgressUpdated', { sourceDirectoryId, checkpoint: checkpointAfterUpdate[0] })
     }
 
     await db.update(sourceDirectory).set({ 
@@ -127,12 +141,18 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+    
+    const finalCheckpoint = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+    await eventBus.emit('scanProgressUpdated', { sourceDirectoryId, checkpoint: finalCheckpoint[0] })
   } catch (error) {
     await db.update(scanCheckpoint).set({
       status: 'failed',
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+    
+    const failedCheckpoint = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
+    await eventBus.emit('scanProgressUpdated', { sourceDirectoryId, checkpoint: failedCheckpoint[0] })
     throw error
   }
 }

@@ -3,10 +3,11 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { db as drizzleDb } from './db'
 import apiRoutes from './routes'
-import { errorHandler, notFoundHandler } from './middleware/errorHandler'
-import { accessLogger, errorLogger } from './middleware/logger'
+import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
+import { accessLogger, errorLogger } from './middleware/loggerMiddleware'
 
-import './services/queueConsumers'
+import './listeners/queueHandlers'
+import { registerEventHandlers } from './listeners/eventHandlers'
 
 dotenv.config()
 
@@ -28,6 +29,8 @@ app.get('/api/health', (req, res) => {
 
 app.use(notFoundHandler)
 app.use(errorHandler)
+
+registerEventHandlers()
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)

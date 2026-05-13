@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { batchExport, getExportStatus } from '../controllers/exportController'
-import { basicAuth } from '../middleware/auth'
+import { basicAuth } from '../middleware/authMiddleware'
 
 const router: Router = Router()
 

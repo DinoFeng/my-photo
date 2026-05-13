@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { apiClient } from '../utils/apiClient'
 
 export interface ExportTask {
   id: string
@@ -10,6 +11,10 @@ export interface ExportTask {
   skipped: number
   errors: number
   currentFile?: string
+}
+
+interface ExportResponse {
+  taskId: string
 }
 
 export const useExportStore = defineStore('export', () => {
@@ -57,34 +62,19 @@ export const useExportStore = defineStore('export', () => {
       includeSubfolders: boolean
     }
   ): Promise<string> => {
-    const response = await fetch('http://localhost:3000/api/export/batch', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + btoa('admin:password'),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        photoIds,
-        ...options
-      })
+    const result = await apiClient.post<ExportResponse>('/api/export/batch', {
+      photoIds,
+      ...options
     })
-
-    const result = await response.json()
     return result.taskId
   }
 
   const getTaskStatus = async (taskId: string): Promise<ExportTask | null> => {
-    const response = await fetch(`http://localhost:3000/api/queue/tasks/${taskId}`, {
-      headers: {
-        'Authorization': 'Basic ' + btoa('admin:password')
-      }
-    })
-
-    if (!response.ok) {
+    try {
+      return await apiClient.get<ExportTask>(`/api/queue/tasks/${taskId}`)
+    } catch {
       return null
     }
-
-    return response.json()
   }
 
   return {

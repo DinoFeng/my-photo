@@ -27,38 +27,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, Image } from 'lucide-vue-next'
+import { useMediaStore } from '../stores/mediaStore'
 
 const { t } = useI18n()
+const mediaStore = useMediaStore()
 
-const loading = ref(true)
 const searchQuery = ref('')
-const mediaList = ref<Array<{ id: string; filename: string; fileType: string }>>([])
+
+const loading = computed(() => mediaStore.loading)
+const mediaList = computed(() => mediaStore.filteredMedia)
 
 const handleSearch = () => {
-  loadMedia()
+  mediaStore.setSearchQuery(searchQuery.value)
 }
 
-const loadMedia = async () => {
-  loading.value = true
-  try {
-    const response = await fetch('http://localhost:3000/api/media', {
-      headers: {
-        'Authorization': 'Basic ' + btoa('admin:password')
-      }
-    })
-    const data = await response.json()
-    mediaList.value = data.data
-  } catch (error) {
-    console.error('Failed to load media:', error)
-  }
-  loading.value = false
-}
+onMounted(async () => {
+  await mediaStore.loadMedia()
+  await mediaStore.connectMediaSSE()
+})
 
-onMounted(() => {
-  loadMedia()
+onUnmounted(() => {
+  mediaStore.disconnectMediaSSE()
 })
 </script>
 

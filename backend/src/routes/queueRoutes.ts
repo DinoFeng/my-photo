@@ -1,16 +1,16 @@
 import { Router } from 'express'
-import { queueService } from '../services/queueService'
+import { queue } from '../utils/queue'
 
 const router: Router = Router()
 
 router.get('/tasks', async (req, res) => {
-  const tasks = await queueService.getAllTasks()
+  const tasks = await queue.getAllTasks()
   res.json(tasks)
 })
 
 router.get('/tasks/:id', async (req, res) => {
   const { id } = req.params
-  const task = await queueService.getTask(id)
+  const task = await queue.getTask(id)
   if (!task) {
     return res.status(404).json({ error: 'Task not found' })
   }
@@ -19,7 +19,7 @@ router.get('/tasks/:id', async (req, res) => {
 
 router.delete('/tasks/:id', async (req, res) => {
   const { id } = req.params
-  const deleted = await queueService.removeTask(id)
+  const deleted = await queue.removeTask(id)
   if (!deleted) {
     return res.status(404).json({ error: 'Task not found' })
   }

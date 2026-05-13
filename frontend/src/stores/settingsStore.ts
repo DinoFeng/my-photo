@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { apiClient } from '../utils/apiClient'
+
+interface Setting {
+  key: string
+  value: string
+}
 
 export const useSettingsStore = defineStore('settings', () => {
   const importPath = ref('./import')
@@ -9,13 +15,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/settings', {
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password')
-        }
-      })
-      const settings = await response.json()
-      settings.forEach((setting: { key: string; value: string }) => {
+      const settings = await apiClient.get<Setting[]>('/api/settings')
+      settings.forEach((setting) => {
         switch (setting.key) {
           case 'importPath':
             importPath.value = setting.value
@@ -50,23 +51,10 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   const saveSetting = async (key: string, value: string) => {
-    const response = await fetch(`http://localhost:3000/api/settings/${key}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': 'Basic ' + btoa('admin:password'),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ value })
-    })
-    if (!response.ok) {
-      await fetch('http://localhost:3000/api/settings', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + btoa('admin:password'),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ key, value })
-      })
+    try {
+      await apiClient.put(`/api/settings/${key}`, { value })
+    } catch {
+      await apiClient.post('/api/settings', { key, value })
     }
   }
 

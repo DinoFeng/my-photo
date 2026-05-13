@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getWatcherStatus } from '../services/fileWatcherService';
-import { queueService } from '../services/queueService';
+import { queue } from '../utils/queue';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq } from 'drizzle-orm';
@@ -10,7 +10,7 @@ const router: Router = Router();
 router.get('/status', async (_req, res) => {
   try {
     const watcherStatus = getWatcherStatus();
-    const tasks = await queueService.getAllTasks();
+    const tasks = await queue.getAllTasks();
     const activeTasks = tasks.filter((t: { status: string }) => t.status === 'pending' || t.status === 'running').length;
     
     const sourceDirsResult = await db.select().from(sourceDirectory);

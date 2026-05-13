@@ -1,13 +1,15 @@
 import { Request, Response } from 'express'
-import { db } from '../db'
-import { scanCheckpoint } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import {
+  findScanCheckpointBySourceDirectoryId,
+  findAllScanCheckpoints,
+  updateScanCheckpoint
+} from '../services/scanCheckpointService'
 
 export async function getScanCheckpoint(req: Request, res: Response) {
   try {
     const { sourceDirectoryId } = req.params
-    const result = await db.select().from(scanCheckpoint).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId))
-    const checkpoint = result[0]
+    const checkpoint = await findScanCheckpointBySourceDirectoryId(sourceDirectoryId)
+    
     if (!checkpoint) {
       return res.status(404).json({ error: 'Scan checkpoint not found' })
     }
@@ -19,30 +21,30 @@ export async function getScanCheckpoint(req: Request, res: Response) {
 
 export async function getAllScanCheckpoints(req: Request, res: Response) {
   try {
-    const checkpoints = await db.select().from(scanCheckpoint)
+    const checkpoints = await findAllScanCheckpoints()
     res.json(checkpoints)
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch scan checkpoints' })
   }
 }
 
-export async function updateScanCheckpoint(req: Request, res: Response) {
+export async function updateScanCheckpointHandler(req: Request, res: Response) {
   try {
     const { sourceDirectoryId } = req.params
     const { status, progress, totalFiles, scannedFiles, errorCount } = req.body
-    const result = await db.update(scanCheckpoint).set({
+    
+    const updated = await updateScanCheckpoint(sourceDirectoryId, {
       status,
       progress,
       totalFiles,
       scannedFiles,
-      errorCount,
-      updatedAt: new Date().toISOString()
-    }).where(eq(scanCheckpoint.sourceDirectoryId, sourceDirectoryId)).returning()
+      errorCount
+    })
     
-    if (result.length === 0) {
+    if (!updated) {
       return res.status(404).json({ error: 'Scan checkpoint not found' })
     }
-    res.json(result[0])
+    res.json(updated)
   } catch (error) {
     res.status(500).json({ error: 'Failed to update scan checkpoint' })
   }
