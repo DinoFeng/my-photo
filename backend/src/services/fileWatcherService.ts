@@ -4,7 +4,7 @@ import { sourceDirectory, media } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils';
 import fs from 'fs';
-import { queue } from '../utils/queue';
+import { queue } from '../instances/queue';
 import { v4 as uuidv4 } from 'uuid';
 
 interface WatcherInstance {

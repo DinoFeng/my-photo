@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { queue } from '../utils/queue'
+import { queue } from '../instances/queue'
 
 export async function batchExport(req: Request, res: Response) {
   try {

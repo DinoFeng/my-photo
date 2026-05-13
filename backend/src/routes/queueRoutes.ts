@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { queue } from '../utils/queue'
+import { queue } from '../instances/queue'
 
 const router: Router = Router()
 

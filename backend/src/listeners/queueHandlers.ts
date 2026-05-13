@@ -1,4 +1,4 @@
-import { queue } from '../utils/queue'
+import { queue } from '../instances/queue'
 import { startScan } from '../services/scanService'
 import { processImport } from '../services/importService'
 import { exportMedia } from '../services/exportService'

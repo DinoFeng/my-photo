@@ -1,5 +1,5 @@
-import { eventBus } from '../utils/eventBus';
-import { scanProgressService, mediaUpdateService } from '../utils/sse';
+import { eventBus } from '../instances/eventBus';
+import { scanProgressService, mediaUpdateService } from '../instances/sse';
 
 export function registerEventHandlers(): void {
   eventBus.on<{ sourceDirectoryId: string; checkpoint: any }>(

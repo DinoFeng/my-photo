@@ -2,7 +2,7 @@ import { db } from '../db'
 import { sourceDirectory, scanCheckpoint, media } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import { queue } from '../utils/queue'
+import { queue } from '../instances/queue'
 
 export interface SourceDirectoryWithCheckpoint {
   id: string

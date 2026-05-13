@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getWatcherStatus } from '../services/fileWatcherService';
-import { queue } from '../utils/queue';
+import { queue } from '../instances/queue';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq } from 'drizzle-orm';

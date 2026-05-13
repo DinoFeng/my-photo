@@ -8,7 +8,7 @@ import {
   triggerScan,
   getScanProgressData
 } from '../services/sourceDirectoryService'
-import { scanProgressService } from '../utils/sse'
+import { scanProgressService } from '../instances/sse'
 
 export async function getAllSourceDirectories(req: Request, res: Response) {
   try {

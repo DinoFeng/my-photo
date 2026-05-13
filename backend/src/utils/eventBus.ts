@@ -4,7 +4,7 @@ interface EventListeners<T> {
   [eventName: string]: EventHandler<T>[];
 }
 
-class EventBus {
+export class EventBus {
   private listeners: EventListeners<any> = {};
 
   on<T>(eventName: string, handler: EventHandler<T>): void {
@@ -36,7 +36,5 @@ class EventBus {
     this.on(eventName, onceHandler);
   }
 }
-
-export const eventBus = new EventBus();
 
 export type { EventHandler };

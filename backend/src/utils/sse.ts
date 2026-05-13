@@ -121,23 +121,3 @@ export class SSEService<T extends SSEClient = SSEClient> {
   }
 }
 
-export const scanProgressService = new SSEService<SSEClient & { sourceDirectoryId?: string }>();
-export const mediaUpdateService = new SSEService();
-
-export function broadcastScanProgress(sourceDirectoryId: string, checkpoint: any): void {
-  scanProgressService.broadcastToFiltered(
-    (client) => client.sourceDirectoryId === sourceDirectoryId,
-    { event: 'progress', data: checkpoint }
-  );
-}
-
-export function broadcastMediaAdded(sourceDirectoryId: string, mediaItem: any): void {
-  const event: SSEEvent = { event: 'media-added', data: mediaItem };
-  
-  scanProgressService.broadcastToFiltered(
-    (client) => client.sourceDirectoryId === sourceDirectoryId,
-    event
-  );
-  
-  mediaUpdateService.broadcast(event);
-}

@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm'
 import { scanDirectory, calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils'
 import fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
-import { eventBus } from '../utils/eventBus'
+import { eventBus } from '../instances/eventBus'
 
 export async function startScan(sourceDirectoryId: string): Promise<void> {
   const result = await db.select().from(sourceDirectory).where(eq(sourceDirectory.id, sourceDirectoryId))

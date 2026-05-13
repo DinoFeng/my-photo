@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { findAllMedia, findMediaById, deleteMedia, getAllMediaForSSE } from '../services/mediaService'
-import { mediaUpdateService } from '../utils/sse'
+import { mediaUpdateService } from '../instances/sse'
 
 export async function getAllMedia(req: Request, res: Response) {
   try {
