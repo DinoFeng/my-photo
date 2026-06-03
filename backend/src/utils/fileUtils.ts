@@ -125,3 +125,35 @@ export async function scanDirectory(dirPath: string): Promise<string[]> {
     scan(dirPath)
   })
 }
+
+export interface ScannedItem {
+  type: 'directory' | 'file'
+  path: string
+}
+
+export async function scanDirectoryNonRecursive(dirPath: string): Promise<ScannedItem[]> {
+  return new Promise((resolve, reject) => {
+    fs.readdir(dirPath, { withFileTypes: true }, (err, entries) => {
+      if (err) return reject(err)
+      
+      const result: ScannedItem[] = []
+      
+      entries.forEach((entry) => {
+        const fullPath = path.join(dirPath, entry.name)
+        if (entry.isDirectory()) {
+          result.push({
+            type: 'directory',
+            path: fullPath
+          })
+        } else if (entry.isFile() && isMediaFile(fullPath)) {
+          result.push({
+            type: 'file',
+            path: fullPath
+          })
+        }
+      })
+      
+      resolve(result)
+    })
+  })
+}

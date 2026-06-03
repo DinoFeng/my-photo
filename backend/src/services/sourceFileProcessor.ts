@@ -14,9 +14,13 @@ export async function processSourceFileAdded(filePath: string, sourceDirId: stri
   const { metadata: rawMetadata, ...mediaData } = metadata
   const now = new Date().toISOString()
 
-  const existingMediaResult = await db.select().from(media)
-    .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirId)))
-  const existingMedia = existingMediaResult[0]
+  const removedMediaWithSameHash = await db.select().from(media)
+    .where(and(
+      eq(media.sourceDirectoryId, sourceDirId),
+      eq(media.hash, hash),
+      eq(media.status, 'removed')
+    ))
+
   const filename = filePath.split('\\').pop() || filePath.split('/').pop() || ''
 
   const processedMediaData = {
@@ -24,9 +28,10 @@ export async function processSourceFileAdded(filePath: string, sourceDirId: stri
     dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
   }
 
-  if (existingMedia) {
+  if (removedMediaWithSameHash.length > 0) {
     await db.update(media).set({
       filename,
+      filepath: filePath,
       fileSize: stat.size,
       fileType,
       hash,
@@ -34,27 +39,47 @@ export async function processSourceFileAdded(filePath: string, sourceDirId: stri
       metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
       status: 'active',
       updatedAt: now
-    }).where(eq(media.id, existingMedia.id))
-    
-    const updatedMedia = { ...existingMedia, filename, fileSize: stat.size, fileType, hash, ...processedMediaData, status: 'active', updatedAt: now }
+    }).where(eq(media.id, removedMediaWithSameHash[0].id))
+
+    const updatedMedia = { ...removedMediaWithSameHash[0], filename, filepath: filePath, fileSize: stat.size, fileType, hash, ...processedMediaData, status: 'active', updatedAt: now }
     await eventBus.emit('mediaAdded', { sourceDirectoryId: sourceDirId, mediaItem: updatedMedia })
   } else {
-    const newMediaId = uuidv4()
-    const newMediaItem = {
-      id: newMediaId,
-      sourceDirectoryId: sourceDirId,
-      filename,
-      filepath: filePath,
-      fileSize: stat.size,
-      fileType,
-      hash,
-      ...processedMediaData,
-      createdAt: now,
-      updatedAt: now
+    const existingMediaResult = await db.select().from(media)
+      .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirId)))
+    const existingMedia = existingMediaResult[0]
+
+    if (existingMedia) {
+      await db.update(media).set({
+        filename,
+        fileSize: stat.size,
+        fileType,
+        hash,
+        ...processedMediaData,
+        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
+        status: 'active',
+        updatedAt: now
+      }).where(eq(media.id, existingMedia.id))
+
+      const updatedMedia = { ...existingMedia, filename, fileSize: stat.size, fileType, hash, ...processedMediaData, status: 'active', updatedAt: now }
+      await eventBus.emit('mediaAdded', { sourceDirectoryId: sourceDirId, mediaItem: updatedMedia })
+    } else {
+      const newMediaId = uuidv4()
+      const newMediaItem = {
+        id: newMediaId,
+        sourceDirectoryId: sourceDirId,
+        filename,
+        filepath: filePath,
+        fileSize: stat.size,
+        fileType,
+        hash,
+        ...processedMediaData,
+        createdAt: now,
+        updatedAt: now
+      }
+      await db.insert(media).values(newMediaItem)
+
+      await eventBus.emit('mediaAdded', { sourceDirectoryId: sourceDirId, mediaItem: newMediaItem })
     }
-    await db.insert(media).values(newMediaItem)
-    
-    await eventBus.emit('mediaAdded', { sourceDirectoryId: sourceDirId, mediaItem: newMediaItem })
   }
 }
 
@@ -68,6 +93,31 @@ export async function processSourceFileChanged(filePath: string, sourceDirId: st
   const processedMediaData = {
     ...mediaData,
     dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
+  }
+
+  const existingByPath = await db.select().from(media)
+    .where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.filepath, filePath)))
+
+  if (existingByPath.length === 0) {
+    const existingByHash = await db.select().from(media)
+      .where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.hash, hash)))
+
+    if (existingByHash.length > 0) {
+      const filename = filePath.split('\\').pop() || filePath.split('/').pop() || ''
+      await db.update(media).set({
+        filename,
+        filepath: filePath,
+        fileSize: stat.size,
+        hash,
+        ...processedMediaData,
+        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
+        updatedAt: now
+      }).where(eq(media.id, existingByHash[0].id))
+
+      const updatedMedia = { ...existingByHash[0], filename, filepath: filePath, fileSize: stat.size, hash, ...processedMediaData, updatedAt: now }
+      await eventBus.emit('mediaAdded', { sourceDirectoryId: sourceDirId, mediaItem: updatedMedia })
+      return
+    }
   }
 
   await db.update(media).set({
