@@ -42,7 +42,9 @@ coverage/
 *.db
 *.sqlite
 *.sqlite3
-data/*.json
+
+# Runtime data directories (contains database and task queue)
+**/data/
 
 # Thumbnails
 .thumbnails/
@@ -58,7 +60,18 @@ data/*.json
 *.swp
 
 # Media files (user data - should not be committed)
-# /photos/
-# /videos/
-# /music/
-# /import/
+# Source directories for watching
+**/sources/
+**/source/
+
+# Thumbnails and cache
+**/thumbnails/
+**/.thumbnails/
+**/.cache/
+
+# Import/export directories
+**/import/
+**/export/
+
+# Uploads
+**/uploads/

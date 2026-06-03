@@ -1,25 +1,42 @@
-import { MessageQueue } from '../utils/queue';
-
-export const messageQueue = new MessageQueue();
+import { queueService } from '../services/queueService';
+import { consumerManager } from '../services/consumerManager';
 
 export const queue = {
   enqueue: async (type: string, payload: Record<string, unknown>): Promise<string> => {
-    return messageQueue.publish(type, payload);
+    return queueService.enqueue(type, payload);
   },
 
   getTask: async (id: string) => {
-    return messageQueue.getJob(id);
+    return queueService.getTask(id);
   },
 
   getAllTasks: async () => {
-    return messageQueue.getAllJobs();
+    return queueService.getAllTasks();
   },
 
-  removeTask: async (id: string): Promise<boolean> => {
-    return messageQueue.removeJob(id);
+  getTasksByType: async (type: string) => {
+    return queueService.getTasksByType(type);
   },
 
   bindConsumer: (queueName: string, handler: (payload: any) => Promise<void>) => {
-    messageQueue.bindConsumer(queueName, handler);
+    consumerManager.registerQueue(queueName, handler);
+  },
+
+  bindConsumers: (queueName: string, handler: (payload: any) => Promise<void>, count: number = 1) => {
+    consumerManager.registerQueue(queueName, handler, { consumerCount: count });
+  },
+
+  getQueueStatus: async (queueName: string) => {
+    return consumerManager.getQueueStatus(queueName);
+  },
+
+  getAllQueueStatuses: async () => {
+    return queueService.getAllQueueStatuses();
+  },
+
+  scaleQueue: async (queueName: string, consumerCount: number) => {
+    return consumerManager.scaleQueue(queueName, consumerCount);
   }
 };
+
+export { queueService, consumerManager };

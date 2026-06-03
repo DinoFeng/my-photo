@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getWatcherStatus } from '../services/fileWatcherService';
+import { getWatcherStatus, getScanProgress } from '../services/fileWatcherService';
 import { queue } from '../instances/queue';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
@@ -43,6 +43,11 @@ router.get('/status', async (_req, res) => {
 router.get('/watchers', async (_req, res) => {
   const status = getWatcherStatus();
   res.json(status);
+});
+
+router.get('/scan-progress', async (_req, res) => {
+  const progress = getScanProgress();
+  res.json(progress);
 });
 
 router.get('/stats', async (_req, res) => {

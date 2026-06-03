@@ -9,86 +9,93 @@ import {
   processSourceFileRemoved 
 } from '../services/sourceFileProcessor'
 
+const broadcastTask = (event: string, type: string, payload: any, error?: string) => {
+  monitorService.broadcast({ 
+    event, 
+    data: { type, payload, error } 
+  });
+};
+
 queue.bindConsumer('scan', async (payload) => {
   console.log(`[Queue] Task started: scan`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'scan', payload } });
+  broadcastTask('task-start', 'scan', payload);
   try {
     await startScan(payload.sourceDirectoryId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'scan', payload } });
+    broadcastTask('task-complete', 'scan', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'scan', payload, error: String(error) } });
+    broadcastTask('task-error', 'scan', payload, String(error));
     throw error;
   }
 })
 
 queue.bindConsumer('import', async (payload) => {
   console.log(`[Queue] Task started: import`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'import', payload } });
+  broadcastTask('task-start', 'import', payload);
   try {
     await processImport(payload.importPath, payload.sourceDirectoryId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'import', payload } });
+    broadcastTask('task-complete', 'import', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'import', payload, error: String(error) } });
+    broadcastTask('task-error', 'import', payload, String(error));
     throw error;
   }
 })
 
 queue.bindConsumer('import-file', async (payload) => {
   console.log(`[Queue] Task started: import-file`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'import-file', payload } });
+  broadcastTask('task-start', 'import-file', payload);
   try {
     await processImport(payload.importPath, payload.sourceDirectoryId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'import-file', payload } });
+    broadcastTask('task-complete', 'import-file', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'import-file', payload, error: String(error) } });
+    broadcastTask('task-error', 'import-file', payload, String(error));
     throw error;
   }
 })
 
 queue.bindConsumer('export', async (payload) => {
   console.log(`[Queue] Task started: export`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'export', payload } });
+  broadcastTask('task-start', 'export', payload);
   try {
     await exportMedia(payload.mediaIds, payload.exportPath, payload.organizePattern)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'export', payload } });
+    broadcastTask('task-complete', 'export', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'export', payload, error: String(error) } });
+    broadcastTask('task-error', 'export', payload, String(error));
     throw error;
   }
 })
 
-queue.bindConsumer('source-file-add', async (payload) => {
+queue.bindConsumers('source-file-add', async (payload) => {
   console.log(`[Queue] Task started: source-file-add`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'source-file-add', payload } });
+  broadcastTask('task-start', 'source-file-add', payload);
   try {
     await processSourceFileAdded(payload.filePath, payload.sourceDirId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'source-file-add', payload } });
+    broadcastTask('task-complete', 'source-file-add', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'source-file-add', payload, error: String(error) } });
+    broadcastTask('task-error', 'source-file-add', payload, String(error));
     throw error;
   }
-})
+}, 3)
 
-queue.bindConsumer('source-file-change', async (payload) => {
+queue.bindConsumers('source-file-change', async (payload) => {
   console.log(`[Queue] Task started: source-file-change`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'source-file-change', payload } });
+  broadcastTask('task-start', 'source-file-change', payload);
   try {
     await processSourceFileChanged(payload.filePath, payload.sourceDirId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'source-file-change', payload } });
+    broadcastTask('task-complete', 'source-file-change', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'source-file-change', payload, error: String(error) } });
+    broadcastTask('task-error', 'source-file-change', payload, String(error));
     throw error;
   }
-})
+}, 2)
 
-queue.bindConsumer('source-file-remove', async (payload) => {
+queue.bindConsumers('source-file-remove', async (payload) => {
   console.log(`[Queue] Task started: source-file-remove`, payload);
-  monitorService.broadcast({ event: 'task-start', data: { type: 'source-file-remove', payload } });
+  broadcastTask('task-start', 'source-file-remove', payload);
   try {
     await processSourceFileRemoved(payload.filePath, payload.sourceDirId)
-    monitorService.broadcast({ event: 'task-complete', data: { type: 'source-file-remove', payload } });
+    broadcastTask('task-complete', 'source-file-remove', payload);
   } catch (error) {
-    monitorService.broadcast({ event: 'task-error', data: { type: 'source-file-remove', payload, error: String(error) } });
+    broadcastTask('task-error', 'source-file-remove', payload, String(error));
     throw error;
   }
-})
+}, 2)
