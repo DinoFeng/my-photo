@@ -3,18 +3,22 @@
     <h1>{{ t('settings') }}</h1>
     
     <div class="settings-section">
-      <h2>{{ t('import') }}</h2>
-      <div class="setting-item">
-        <label>{{ t('path') }}</label>
-        <input v-model="importPath" type="text" />
-      </div>
-    </div>
-
-    <div class="settings-section">
       <h2>{{ t('export') }}</h2>
       <div class="setting-item">
-        <label>{{ t('path') }}</label>
-        <input v-model="exportPath" type="text" />
+        <label>{{ t('organizePattern') }}</label>
+        <select v-model="organizePattern">
+          <option value="date">{{ t('organizeByDate') }}</option>
+          <option value="type">{{ t('organizeByType') }}</option>
+          <option value="original">{{ t('keepOriginal') }}</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>{{ t('duplicateStrategy') }}</label>
+        <select v-model="duplicateStrategy">
+          <option value="skip">{{ t('skipDuplicate') }}</option>
+          <option value="overwrite">{{ t('overwriteDuplicate') }}</option>
+          <option value="rename">{{ t('renameDuplicate') }}</option>
+        </select>
       </div>
     </div>
 
@@ -25,15 +29,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '../stores/settingsStore'
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
-const importPath = ref('./import')
-const exportPath = ref('./export')
+const organizePattern = ref('date')
+const duplicateStrategy = ref('skip')
 
-const saveSettings = () => {
+onMounted(async () => {
+  await settingsStore.loadSettings()
+  organizePattern.value = settingsStore.organizePattern
+  duplicateStrategy.value = settingsStore.duplicateStrategy
+})
+
+const saveSettings = async () => {
+  settingsStore.organizePattern = organizePattern.value
+  settingsStore.duplicateStrategy = duplicateStrategy.value
+  await settingsStore.saveSettings()
   alert(t('success'))
 }
 </script>

@@ -1,11 +1,9 @@
 import chokidar from 'chokidar';
 import { db } from '../db';
-import { sourceDirectory, media } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
-import { calculateFileHash, getFileMetadata, getFileType } from '../utils/fileUtils';
-import fs from 'fs';
+import { sourceDirectory } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { queue } from '../instances/queue';
-import { v4 as uuidv4 } from 'uuid';
+import { monitorService } from '../instances/sse';
 
 interface WatcherInstance {
   watcher: chokidar.FSWatcher;
@@ -31,86 +29,41 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
   });
 
   watcher.on('add', async (filePath: string) => {
+    console.log(`[Watch] File added: ${filePath}`);
+    monitorService.broadcast({ event: 'file-add', data: { filePath, sourceDirId } });
     try {
-      const stat = fs.statSync(filePath);
-      const hash = await calculateFileHash(filePath);
-      const metadata = await getFileMetadata(filePath);
-      const fileType = getFileType(filePath);
-      const { metadata: rawMetadata, ...mediaData } = metadata;
-      const now = new Date().toISOString();
-
-      const existingMediaResult = await db.select().from(media)
-        .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirId)))
-      const existingMedia = existingMediaResult[0];
-      const filename = filePath.split('\\').pop() || filePath.split('/').pop() || '';
-
-      const processedMediaData = {
-        ...mediaData,
-        dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
-      };
-
-      if (existingMedia) {
-        await db.update(media).set({
-          filename,
-          fileSize: stat.size,
-          fileType,
-          hash,
-          ...processedMediaData,
-          metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
-          updatedAt: now
-        }).where(eq(media.id, existingMedia.id));
-      } else {
-        await db.insert(media).values({
-          id: uuidv4(),
-          sourceDirectoryId: sourceDirId,
-          filename,
-          filepath: filePath,
-          fileSize: stat.size,
-          fileType,
-          hash,
-          ...processedMediaData,
-          createdAt: now,
-          updatedAt: now
-        });
-      }
+      await queue.enqueue('source-file-add', { 
+        filePath, 
+        sourceDirId 
+      });
     } catch (error) {
-      console.error('Error processing added file:', error);
+      console.error('Error queueing added file:', error);
     }
   });
 
   watcher.on('change', async (filePath: string) => {
+    console.log(`[Watch] File changed: ${filePath}`);
+    monitorService.broadcast({ event: 'file-change', data: { filePath, sourceDirId } });
     try {
-      const stat = fs.statSync(filePath);
-      const hash = await calculateFileHash(filePath);
-      const metadata = await getFileMetadata(filePath);
-      const { metadata: rawMetadata, ...mediaData } = metadata;
-      const now = new Date().toISOString();
-
-      const processedMediaData = {
-        ...mediaData,
-        dateTaken: mediaData.dateTaken ? mediaData.dateTaken.toISOString() : undefined
-      };
-
-      await db.update(media).set({
-        fileSize: stat.size,
-        hash,
-        ...processedMediaData,
-        metadata: rawMetadata ? JSON.stringify(rawMetadata) : undefined,
-        updatedAt: now
-      }).where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.filepath, filePath)));
+      await queue.enqueue('source-file-change', { 
+        filePath, 
+        sourceDirId 
+      });
     } catch (error) {
-      console.error('Error processing changed file:', error);
+      console.error('Error queueing changed file:', error);
     }
   });
 
   watcher.on('unlink', async (filePath: string) => {
+    console.log(`[Watch] File removed: ${filePath}`);
+    monitorService.broadcast({ event: 'file-remove', data: { filePath, sourceDirId } });
     try {
-      await db.update(media).set({
-        status: 'removed',
-        updatedAt: new Date().toISOString()
-      }).where(and(eq(media.sourceDirectoryId, sourceDirId), eq(media.filepath, filePath)));
+      await queue.enqueue('source-file-remove', { 
+        filePath, 
+        sourceDirId 
+      });
     } catch (error) {
-      console.error('Error processing removed file:', error);
+      console.error('Error queueing removed file:', error);
     }
   });
 
@@ -140,6 +93,8 @@ export async function startImportDirWatcher(importPath: string): Promise<void> {
   });
 
   watcher.on('add', async (filePath: string) => {
+    console.log(`[Watch] Import file detected: ${filePath}`);
+    monitorService.broadcast({ event: 'import-file-add', data: { filePath } });
     try {
       await queue.enqueue('import-file', { filePath });
     } catch (error) {

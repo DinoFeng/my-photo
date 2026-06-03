@@ -9,6 +9,15 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true
+      }
+    }
+  },
   build: {
     target: 'es2020',
     minify: 'terser',

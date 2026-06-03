@@ -62,7 +62,7 @@ export const useExportStore = defineStore('export', () => {
       includeSubfolders: boolean
     }
   ): Promise<string> => {
-    const result = await apiClient.post<ExportResponse>('/api/export/batch', {
+    const result = await apiClient.post<ExportResponse>('/export/batch', {
       photoIds,
       ...options
     })
@@ -71,7 +71,7 @@ export const useExportStore = defineStore('export', () => {
 
   const getTaskStatus = async (taskId: string): Promise<ExportTask | null> => {
     try {
-      return await apiClient.get<ExportTask>(`/api/queue/tasks/${taskId}`)
+      return await apiClient.get<ExportTask>(`/queue/tasks/${taskId}`)
     } catch {
       return null
     }

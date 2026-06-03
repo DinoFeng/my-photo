@@ -5,6 +5,5 @@ export function notFoundHandler(req: Request, res: Response) {
 }
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  console.error('Error:', err)
   res.status(500).json({ error: err.message || 'Internal server error' })
 }

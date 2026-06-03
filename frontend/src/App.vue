@@ -10,10 +10,6 @@
           <LayoutGrid :size="20" />
           <span>{{ t('gallery') }}</span>
         </router-link>
-        <router-link to="/source-dirs" class="nav-item" :class="{ active: $route.name === 'sourceDirs' }">
-          <Folder :size="20" />
-          <span>{{ t('sourceDirs') }}</span>
-        </router-link>
         <router-link to="/settings" class="nav-item" :class="{ active: $route.name === 'settings' }">
           <Settings :size="20" />
           <span>{{ t('settings') }}</span>
@@ -28,9 +24,20 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Image, LayoutGrid, Folder, Settings } from 'lucide-vue-next'
+import { onMounted, onUnmounted } from 'vue'
+import { Image, LayoutGrid, Settings } from 'lucide-vue-next'
+import { useMonitorStore } from './stores/monitorStore'
 
 const { t } = useI18n()
+const monitorStore = useMonitorStore()
+
+onMounted(() => {
+  monitorStore.connect()
+})
+
+onUnmounted(() => {
+  monitorStore.disconnect()
+})
 </script>
 
 <style>

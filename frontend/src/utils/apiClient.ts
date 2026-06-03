@@ -1,4 +1,3 @@
-const API_BASE_URL = 'http://localhost:3000'
 const AUTH_HEADER = 'Basic ' + btoa('admin:password')
 
 interface RequestOptions {
@@ -23,7 +22,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     config.body = JSON.stringify(body)
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+  const response = await fetch(`/api${endpoint}`, config)
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`)
@@ -60,7 +59,7 @@ export async function sseRequest(
   handlers: SSEEventHandlers,
   abortSignal: AbortSignal
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(`/api${endpoint}`, {
     headers: {
       'Authorization': AUTH_HEADER,
       'Accept': 'text/event-stream'

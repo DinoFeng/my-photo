@@ -48,7 +48,7 @@ export const useMediaStore = defineStore('media', () => {
         params.set('search', search)
       }
 
-      const data = await apiClient.get<MediaResponse>(`/api/media?${params}`)
+      const data = await apiClient.get<MediaResponse>(`/media?${params}`)
       mediaList.value = data.data
       currentPage.value = data.pagination.page
       totalPages.value = data.pagination.pages
@@ -73,7 +73,7 @@ export const useMediaStore = defineStore('media', () => {
 
   const deleteMedia = async (id: string) => {
     try {
-      await apiClient.delete(`/api/media/${id}`)
+      await apiClient.delete(`/media/${id}`)
       mediaList.value = mediaList.value.filter(m => m.id !== id)
     } catch (error) {
       console.error('Failed to delete media:', error)
@@ -93,7 +93,7 @@ export const useMediaStore = defineStore('media', () => {
     
     try {
       await sseRequest(
-        '/api/sse/media-updates',
+        '/sse/media-updates',
         {
           'media-added': (mediaItem: Media) => {
             addMedia(mediaItem)

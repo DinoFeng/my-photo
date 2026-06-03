@@ -15,7 +15,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const loadSettings = async () => {
     try {
-      const settings = await apiClient.get<Setting[]>('/api/settings')
+      const settings = await apiClient.get<Setting[]>('/settings')
       settings.forEach((setting) => {
         switch (setting.key) {
           case 'importPath':
@@ -52,9 +52,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const saveSetting = async (key: string, value: string) => {
     try {
-      await apiClient.put(`/api/settings/${key}`, { value })
+      await apiClient.put(`/settings/${key}`, { value })
     } catch {
-      await apiClient.post('/api/settings', { key, value })
+      await apiClient.post('/settings', { key, value })
     }
   }
 
