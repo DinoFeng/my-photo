@@ -264,15 +264,143 @@ SourceDirectory 1 ── * Photo
 
 ## 6. 核心业务流程
 
-### 6.1 照片索引流程
+### 6.1 系统启动流程
 
-```
-用户添加源目录 → ScanService 扫描目录 → 读取文件元数据 → 创建 Photo 记录 → 生成缩略图
-                                                      ↓
-                                            标记文件状态为 active
+```mermaid
+sequenceDiagram
+    participant Server as server.ts
+    participant Env as dotenv
+    participant Express as Express App
+    participant Middleware as Middleware
+    participant Routes as API Routes
+    participant DB as Database
+    participant EventBus as EventBus
+    participant Queue as Queue
+    participant InitService as initService
+    participant Watcher as FileWatcher
+
+    Server->>Env: dotenv.config()
+    Env-->>Server: 环境变量加载完成
+    
+    Server->>Express: 创建 Express 应用
+    Express-->>Server: 应用实例
+    
+    Server->>Middleware: app.use(accessLogger)
+    Server->>Middleware: app.use(cors())
+    Server->>Middleware: app.use(express.json())
+    Server->>Middleware: app.use(express.static)
+    
+    Server->>Routes: app.use('/api', apiRoutes)
+    Routes->>Routes: 注册子路由: /media, /scan, /settings, /export, /queue, /monitor, /sse
+    
+    Server->>Queue: import queueHandlers
+    Queue->>Queue: 绑定消费者: scan, import, export, source-file-add/change/remove
+    
+    Server->>EventBus: registerEventHandlers()
+    EventBus->>EventBus: 注册事件监听: scanProgressUpdated, mediaAdded
+    
+    Server->>InitService: initSourceDirectories()
+    InitService->>DB: 查询现有 sourceDirectory
+    DB-->>InitService: 返回目录列表
+    InitService->>InitService: 自动发现/创建源目录
+    InitService->>DB: 插入新目录记录
+    DB-->>InitService: 返回结果
+    InitService-->>Server: 返回目录ID列表
+    
+    Server->>Express: app.listen(PORT)
+    Express-->>Server: 服务器启动成功
+    
+    Server->>Watcher: startWatchersForAllSourceDirs()
+    Watcher->>DB: 查询启用的 sourceDirectory
+    DB-->>Watcher: 返回目录列表
+    loop 每个启用的目录
+        Watcher->>Watcher: startSourceDirWatcher(dir.id, dir.path)
+        Watcher->>Watcher: detectAndProcessNewFiles(dir.id, dir.path)
+        Watcher->>Queue: enqueue('source-file-add', {filePath, sourceDirId})
+    end
+    Watcher-->>Server: 监听器启动完成
 ```
 
-### 6.2 导入整理流程
+**启动流程详解：**
+
+| 阶段 | 组件 | 职责 |
+|------|------|------|
+| 1. 环境初始化 | `dotenv` | 加载 `.env` 环境变量 |
+| 2. Express 初始化 | `server.ts` | 创建应用实例，注册中间件和路由 |
+| 3. 队列消费者注册 | `queueHandlers.ts` | 绑定 scan、import、export、source-file-add/change/remove 等任务处理器 |
+| 4. 事件总线注册 | `eventHandlers.ts` | 注册 scanProgressUpdated、mediaAdded 事件监听 |
+| 5. 源目录初始化 | `initService.ts` | 自动发现 SOURCES_PATH 下的目录，不存在时创建默认目录 |
+| 6. HTTP 服务启动 | Express | 监听指定端口（默认 3000） |
+| 7. 文件监控启动 | `fileWatcherService.ts` | 为每个启用的源目录创建 chokidar 监听器，检测新文件并加入处理队列 |
+
+### 6.2 扫描队列消息流转流程
+
+```mermaid
+sequenceDiagram
+    participant API as POST /api/scan/:id
+    participant ScanQueue as scan队列
+    participant ScanConsumer as scan消费者
+    participant AddQueue as source-file-add队列
+    participant ChangeQueue as source-file-change队列
+    participant FileConsumer as 文件消费者
+    participant DB as Database
+
+    API->>ScanQueue: enqueue('scan', { sourceDirectoryId })
+    
+    ScanQueue->>ScanConsumer: 处理消息
+    ScanConsumer->>DB: SELECT * FROM source_directory WHERE id = ?
+    DB-->>ScanConsumer: 返回目录信息 { id, path, name }
+    
+    ScanConsumer->>ScanConsumer: 扫描当前目录（非递归）
+    
+    alt 发现子目录
+        ScanConsumer->>ScanConsumer: 检查子目录是否已注册
+        ScanConsumer->>DB: INSERT/SELECT source_directory
+        ScanConsumer->>ScanQueue: enqueue('scan', { sourceDirectoryId: subDirId })
+    end
+    
+    alt 发现新文件
+        ScanConsumer->>AddQueue: enqueue('source-file-add', { filePath, sourceDirId })
+        AddQueue->>FileConsumer: 处理消息
+        FileConsumer->>DB: INSERT INTO media
+    end
+    
+    alt 发现已有文件（有变化）
+        ScanConsumer->>DB: SELECT hash FROM media WHERE filepath = ?
+        DB-->>ScanConsumer: 返回当前hash
+        ScanConsumer->>ScanConsumer: 计算文件hash对比
+        ScanConsumer->>ChangeQueue: enqueue('source-file-change', { filePath, sourceDirId })
+        ChangeQueue->>FileConsumer: 处理消息
+        FileConsumer->>DB: UPDATE media
+    end
+    
+    alt 文件无变化
+        ScanConsumer->>ScanConsumer: 跳过
+    end
+```
+
+**职责分离说明：**
+
+| 队列 | 职责 | 处理内容 |
+|------|------|----------|
+| `scan` | 发现任务 | 扫描目录、发现子目录和文件、判断文件状态 |
+| `source-file-add` | 新增任务 | 处理新文件、插入数据库记录 |
+| `source-file-change` | 更新任务 | 处理文件变更、更新数据库记录 |
+| `source-file-remove` | 删除任务 | 处理文件删除、标记记录为removed |
+
+### 6.3 文件重命名处理流程
+
+```mermaid
+flowchart TD
+    A[用户重命名文件] --> B[Watcher检测到unlink+add事件]
+    B --> C[file-remove队列标记为removed]
+    B --> D[file-add队列处理]
+    D --> E{检测到相同hash的removed记录?}
+    E -->|是| F[更新filepath并恢复为active]
+    E -->|否| G[创建新记录]
+```
+
+### 6.4 导入整理流程
 
 ```
 WatchService 检测新文件 → ImportService 获取组织规则 → 计算目标路径 → 复制/移动文件 → 更新索引
@@ -280,7 +408,7 @@ WatchService 检测新文件 → ImportService 获取组织规则 → 计算目�
                                                       创建 ImportTask 记录
 ```
 
-### 6.3 文件变更检测流程
+### 6.5 文件变更检测流程
 
 ```
 系统启动 → 扫描所有源目录 → 对比数据库记录 → 更新缺失文件状态 → 发现新文件 → 添加索引

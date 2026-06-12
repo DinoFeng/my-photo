@@ -28,18 +28,6 @@ queue.bindConsumer('scan', async (payload) => {
   }
 })
 
-queue.bindConsumer('import', async (payload) => {
-  console.log(`[Queue] Task started: import`, payload);
-  broadcastTask('task-start', 'import', payload);
-  try {
-    await processImport(payload.importPath, payload.sourceDirectoryId)
-    broadcastTask('task-complete', 'import', payload);
-  } catch (error) {
-    broadcastTask('task-error', 'import', payload, String(error));
-    throw error;
-  }
-})
-
 queue.bindConsumer('import-file', async (payload) => {
   console.log(`[Queue] Task started: import-file`, payload);
   broadcastTask('task-start', 'import-file', payload);
