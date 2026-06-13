@@ -119,25 +119,7 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
 }
 
 async function processSubDirectory(dirPath: string, parentSourceDirectoryId: string): Promise<void> {
-  const existing = await db.select().from(sourceDirectory).where(eq(sourceDirectory.path, dirPath))
-  
-  if (existing.length === 0) {
-    const now = new Date().toISOString()
-    const newDir = await db.insert(sourceDirectory).values({
-      id: uuidv4(),
-      path: dirPath,
-      name: path.basename(dirPath),
-      enabled: true,
-      createdAt: now,
-      updatedAt: now
-    }).returning()
-    
-    await queue.enqueue('scan', { sourceDirectoryId: newDir[0].id })
-  } else {
-    if (existing[0].enabled) {
-      await queue.enqueue('scan', { sourceDirectoryId: existing[0].id })
-    }
-  }
+  await queue.enqueue('scan', { path: dirPath })
 }
 
 async function processFile(filePath: string, sourceDirectoryId: string): Promise<void> {
@@ -145,12 +127,17 @@ async function processFile(filePath: string, sourceDirectoryId: string): Promise
     .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirectoryId)))
   const existingMedia = existingMediaResult[0]
 
+  const sourceDirResult = await db.select({ path: sourceDirectory.path })
+    .from(sourceDirectory)
+    .where(eq(sourceDirectory.id, sourceDirectoryId))
+  const sourceDirPath = sourceDirResult[0]?.path || ''
+
   if (!existingMedia) {
-    await queue.enqueue('source-file-add', { filePath, sourceDirId: sourceDirectoryId })
+    await queue.enqueue('source-file-add', { filePath, sourceDirPath })
   } else {
     const currentHash = await calculateFileHash(filePath)
     if (existingMedia.hash !== currentHash) {
-      await queue.enqueue('source-file-change', { filePath, sourceDirId: sourceDirectoryId })
+      await queue.enqueue('source-file-change', { filePath, sourceDirPath })
     }
   }
 }

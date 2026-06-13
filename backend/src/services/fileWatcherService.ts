@@ -35,7 +35,7 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     try {
       await queue.enqueue('source-file-add', { 
         filePath, 
-        sourceDirId 
+        sourceDirPath: watchPath 
       });
     } catch (error) {
       console.error('Error queueing added file:', error);
@@ -48,7 +48,7 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     try {
       await queue.enqueue('source-file-change', { 
         filePath, 
-        sourceDirId 
+        sourceDirPath: watchPath 
       });
     } catch (error) {
       console.error('Error queueing changed file:', error);
@@ -61,7 +61,7 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     try {
       await queue.enqueue('source-file-remove', { 
         filePath, 
-        sourceDirId 
+        sourceDirPath: watchPath 
       });
     } catch (error) {
       console.error('Error queueing removed file:', error);
@@ -221,7 +221,7 @@ export async function detectAndProcessNewFiles(sourceDirId: string, watchPath: s
     let processed = 0;
     for (const filePath of newFiles) {
       try {
-        await queue.enqueue('source-file-add', { filePath, sourceDirId });
+        await queue.enqueue('source-file-add', { filePath, sourceDirPath: watchPath });
         processed++;
         scanProgressMap.set(sourceDirId, {
           ...scanProgressMap.get(sourceDirId)!,

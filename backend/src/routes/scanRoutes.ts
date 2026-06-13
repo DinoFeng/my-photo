@@ -12,7 +12,7 @@ router.post('/all', basicAuth, async (req, res) => {
     const dirs = await db.select().from(sourceDirectory)
     
     for (const dir of dirs) {
-      await queue.enqueue('scan', { sourceDirectoryId: dir.id })
+      await queue.enqueue('scan', { path: dir.path })
     }
     
     res.json({ message: `Scanning ${dirs.length} directories`, directories: dirs.map(d => d.name) })
@@ -24,7 +24,17 @@ router.post('/all', basicAuth, async (req, res) => {
 router.post('/:sourceDirectoryId', basicAuth, async (req, res) => {
   try {
     const { sourceDirectoryId } = req.params
-    await queue.enqueue('scan', { sourceDirectoryId })
+    const { db } = await import('../db')
+    const { sourceDirectory } = await import('../db/schema')
+    const { eq } = await import('drizzle-orm')
+    
+    const result = await db.select().from(sourceDirectory).where(eq(sourceDirectory.id, sourceDirectoryId))
+    if (result.length === 0) {
+      res.status(404).json({ error: 'Source directory not found' })
+      return
+    }
+    
+    await queue.enqueue('scan', { path: result[0].path })
     res.json({ message: 'Scan started', sourceDirectoryId })
   } catch (error) {
     res.status(500).json({ error: 'Failed to start scan' })

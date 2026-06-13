@@ -1,8 +1,8 @@
-import { queueService } from '../services/queueService';
+import { queueService, type EnqueueResult } from '../services/queueService';
 import { consumerManager } from '../services/consumerManager';
 
 export const queue = {
-  enqueue: async (type: string, payload: Record<string, unknown>): Promise<string> => {
+  enqueue: async (type: string, payload: Record<string, unknown>): Promise<EnqueueResult> => {
     return queueService.enqueue(type, payload);
   },
 
@@ -40,3 +40,4 @@ export const queue = {
 };
 
 export { queueService, consumerManager };
+export type { EnqueueResult };
