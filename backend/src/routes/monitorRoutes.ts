@@ -1,17 +1,33 @@
 import { Router } from 'express';
 import { getWatcherStatus, getScanProgress } from '../services/fileWatcherService';
-import { queue } from '../instances/queue';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import {
+  scanFanout,
+  importFanout,
+  exportFanout,
+  sourceFileAddFanout,
+  sourceFileChangeFanout,
+  sourceFileRemoveFanout
+} from '../instances/fanoutQueues';
 
 const router: Router = Router();
+
+const fanoutMap = [scanFanout, importFanout, exportFanout, sourceFileAddFanout, sourceFileChangeFanout, sourceFileRemoveFanout];
 
 router.get('/status', async (_req, res) => {
   try {
     const watcherStatus = getWatcherStatus();
-    const tasks = await queue.getAllTasks();
-    const activeTasks = tasks.filter((t: { status: string }) => t.status === 'pending' || t.status === 'running').length;
+    
+    const allTasks = await Promise.all(
+      fanoutMap.map(async (fanout) => {
+        const queue = fanout.getQueue(fanout.getQueueNames()[0]);
+        return queue.getAllTasks();
+      })
+    );
+    const tasks = allTasks.flat();
+    const activeTasks = tasks.filter((t: { status: string }) => t.status === 'pending' || t.status === 'processing').length;
     
     const sourceDirsResult = await db.select().from(sourceDirectory);
     const sourceDirsCount = sourceDirsResult.length;

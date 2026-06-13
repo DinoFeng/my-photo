@@ -180,6 +180,24 @@ src/
                         └─ 否 → services/ (如：mediaService.ts)
 ```
 
+## 开发工具规范
+
+### 包管理器要求
+
+**规定**：项目必须使用 `pnpm` 作为包管理器，禁止使用 `npm` 或 `yarn`。
+
+**实施规则**：
+- 所有依赖安装必须使用 `pnpm install`
+- 禁止使用 `npm install` 或 `yarn install`
+- package.json 中的脚本命令应使用 `pnpm run` 前缀
+- 提交代码前必须确保使用 pnpm 安装依赖
+
+**优势**：
+- 更快的安装速度
+- 更节省磁盘空间（共享依赖）
+- 更好的依赖版本控制
+- 支持 workspace 管理
+
 ## 架构约束
 
 ### 依赖方向
@@ -236,4 +254,4 @@ eventBus.on('scanProgressUpdated', ({ sourceDirectoryId, checkpoint }) => {
 - 新增模块必须遵循单一职责和依赖注入原则
 - 违反原则的代码提交将被拒绝
 
-**Version**: 3.1.0 | **Ratified**: 2026-05-10 | **Last Amended**: 2026-05-14
+**Version**: 3.2.0 | **Ratified**: 2026-05-10 | **Last Amended**: 2026-06-13

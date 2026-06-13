@@ -2,7 +2,12 @@ import chokidar from 'chokidar';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
-import { queue } from '../instances/queue';
+import {
+  sourceFileAddFanout,
+  sourceFileChangeFanout,
+  sourceFileRemoveFanout,
+  importFanout
+} from '../instances/fanoutQueues';
 import { monitorService } from '../instances/sse';
 import { scanDirectory } from '../utils/fileUtils';
 
@@ -33,9 +38,9 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     console.log(`[Watch] File added: ${filePath}`);
     monitorService.broadcast({ event: 'file-add', data: { filePath, sourceDirId } });
     try {
-      await queue.enqueue('source-file-add', { 
+      await sourceFileAddFanout.publish({ 
         filePath, 
-        sourceDirPath: watchPath 
+        sourceDirId 
       });
     } catch (error) {
       console.error('Error queueing added file:', error);
@@ -46,9 +51,9 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     console.log(`[Watch] File changed: ${filePath}`);
     monitorService.broadcast({ event: 'file-change', data: { filePath, sourceDirId } });
     try {
-      await queue.enqueue('source-file-change', { 
+      await sourceFileChangeFanout.publish({ 
         filePath, 
-        sourceDirPath: watchPath 
+        sourceDirId 
       });
     } catch (error) {
       console.error('Error queueing changed file:', error);
@@ -59,9 +64,9 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
     console.log(`[Watch] File removed: ${filePath}`);
     monitorService.broadcast({ event: 'file-remove', data: { filePath, sourceDirId } });
     try {
-      await queue.enqueue('source-file-remove', { 
+      await sourceFileRemoveFanout.publish({ 
         filePath, 
-        sourceDirPath: watchPath 
+        sourceDirId 
       });
     } catch (error) {
       console.error('Error queueing removed file:', error);
@@ -97,7 +102,7 @@ export async function startImportDirWatcher(importPath: string): Promise<void> {
     console.log(`[Watch] Import file detected: ${filePath}`);
     monitorService.broadcast({ event: 'import-file-add', data: { filePath } });
     try {
-      await queue.enqueue('import-file', { filePath });
+      await importFanout.publish({ filePath, sourceDirectoryId: '' });
     } catch (error) {
       console.error('Error queueing import file:', error);
     }
@@ -221,7 +226,7 @@ export async function detectAndProcessNewFiles(sourceDirId: string, watchPath: s
     let processed = 0;
     for (const filePath of newFiles) {
       try {
-        await queue.enqueue('source-file-add', { filePath, sourceDirPath: watchPath });
+        await sourceFileAddFanout.publish({ filePath, sourceDirId });
         processed++;
         scanProgressMap.set(sourceDirId, {
           ...scanProgressMap.get(sourceDirId)!,

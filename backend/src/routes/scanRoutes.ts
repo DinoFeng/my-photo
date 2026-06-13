@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { startScan } from '../services/scanService'
-import { queue } from '../instances/queue'
+import { scanFanout } from '../instances/fanoutQueues'
 import { basicAuth } from '../middleware/authMiddleware'
 
 const router: Router = Router()
@@ -12,7 +12,7 @@ router.post('/all', basicAuth, async (req, res) => {
     const dirs = await db.select().from(sourceDirectory)
     
     for (const dir of dirs) {
-      await queue.enqueue('scan', { path: dir.path })
+      await scanFanout.publish({ sourceDirectoryId: dir.id })
     }
     
     res.json({ message: `Scanning ${dirs.length} directories`, directories: dirs.map(d => d.name) })
@@ -34,7 +34,7 @@ router.post('/:sourceDirectoryId', basicAuth, async (req, res) => {
       return
     }
     
-    await queue.enqueue('scan', { path: result[0].path })
+    await scanFanout.publish({ sourceDirectoryId })
     res.json({ message: 'Scan started', sourceDirectoryId })
   } catch (error) {
     res.status(500).json({ error: 'Failed to start scan' })

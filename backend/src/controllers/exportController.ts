@@ -1,11 +1,11 @@
 import { Request, Response } from 'express'
-import { queue } from '../instances/queue'
+import { exportFanout } from '../instances/fanoutQueues'
 
 export async function batchExport(req: Request, res: Response) {
   try {
     const { mediaIds, exportPath, organizePattern } = req.body
-    const taskId = await queue.enqueue('export', { mediaIds, exportPath, organizePattern })
-    res.json({ message: 'Export started', taskId })
+    await exportFanout.publish({ mediaIds, exportPath, organizePattern })
+    res.json({ message: 'Export started' })
   } catch (error) {
     res.status(500).json({ error: 'Failed to start export' })
   }

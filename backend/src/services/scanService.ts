@@ -2,7 +2,7 @@ import { db } from '../db'
 import { sourceDirectory, media, scanCheckpoint } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { scanDirectoryNonRecursive, calculateFileHash, isMediaFile } from '../utils/fileUtils'
-import { queue } from '../instances/queue'
+import { scanFanout, sourceFileAddFanout, sourceFileChangeFanout } from '../instances/fanoutQueues'
 import { v4 as uuidv4 } from 'uuid'
 import { eventBus } from '../instances/eventBus'
 import fs from 'fs'
@@ -119,7 +119,7 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
 }
 
 async function processSubDirectory(dirPath: string, parentSourceDirectoryId: string): Promise<void> {
-  await queue.enqueue('scan', { path: dirPath })
+  await scanFanout.publish({ sourceDirectoryId: parentSourceDirectoryId })
 }
 
 async function processFile(filePath: string, sourceDirectoryId: string): Promise<void> {
@@ -127,17 +127,12 @@ async function processFile(filePath: string, sourceDirectoryId: string): Promise
     .where(and(eq(media.filepath, filePath), eq(media.sourceDirectoryId, sourceDirectoryId)))
   const existingMedia = existingMediaResult[0]
 
-  const sourceDirResult = await db.select({ path: sourceDirectory.path })
-    .from(sourceDirectory)
-    .where(eq(sourceDirectory.id, sourceDirectoryId))
-  const sourceDirPath = sourceDirResult[0]?.path || ''
-
   if (!existingMedia) {
-    await queue.enqueue('source-file-add', { filePath, sourceDirPath })
+    await sourceFileAddFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
   } else {
     const currentHash = await calculateFileHash(filePath)
     if (existingMedia.hash !== currentHash) {
-      await queue.enqueue('source-file-change', { filePath, sourceDirPath })
+      await sourceFileChangeFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
     }
   }
 }

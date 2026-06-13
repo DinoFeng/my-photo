@@ -1,22 +1,45 @@
 import { Router, Request, Response } from 'express';
-import { queue, queueService, consumerManager } from '../instances/queue';
+import {
+  scanFanout,
+  importFanout,
+  exportFanout,
+  sourceFileAddFanout,
+  sourceFileChangeFanout,
+  sourceFileRemoveFanout
+} from '../instances/fanoutQueues';
 
 const router: Router = Router();
 
+interface TaskStatus {
+  status: string;
+}
+
+const fanoutMap: Record<string, typeof scanFanout> = {
+  'scan': scanFanout,
+  'import-file': importFanout,
+  'export': exportFanout,
+  'source-file-add': sourceFileAddFanout,
+  'source-file-change': sourceFileChangeFanout,
+  'source-file-remove': sourceFileRemoveFanout
+};
+
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const statuses = await queue.getAllQueueStatuses();
+    const statuses = await Promise.all(
+      Object.entries(fanoutMap).map(async ([name, fanout]) => {
+        const queue = fanout.getQueue(fanout.getQueueNames()[0]);
+        const tasks = await queue.getAllTasks();
+        return {
+          name,
+          queues: fanout.getQueueNames(),
+          pending: tasks.filter((t: TaskStatus) => t.status === 'pending').length,
+          processing: tasks.filter((t: TaskStatus) => t.status === 'processing').length,
+          completed: tasks.filter((t: TaskStatus) => t.status === 'done').length,
+          failed: tasks.filter((t: TaskStatus) => t.status === 'failed').length
+        };
+      })
+    );
     res.json(statuses);
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.get('/status/:queueName', async (req: Request, res: Response) => {
-  try {
-    const { queueName } = req.params;
-    const status = await queue.getQueueStatus(queueName);
-    res.json(status);
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
@@ -25,88 +48,20 @@ router.get('/status/:queueName', async (req: Request, res: Response) => {
 router.get('/tasks', async (req: Request, res: Response) => {
   try {
     const { type } = req.query;
-    let tasks;
-    if (type) {
-      tasks = await queue.getTasksByType(type as string);
+    if (type && fanoutMap[type as string]) {
+      const fanout = fanoutMap[type as string];
+      const queue = fanout.getQueue(fanout.getQueueNames()[0]);
+      const tasks = await queue.getAllTasks();
+      res.json(tasks);
     } else {
-      tasks = await queue.getAllTasks();
+      const allTasks = await Promise.all(
+        Object.values(fanoutMap).map(async (fanout) => {
+          const queue = fanout.getQueue(fanout.getQueueNames()[0]);
+          return queue.getAllTasks();
+        })
+      );
+      res.json(allTasks.flat());
     }
-    res.json(tasks);
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.get('/tasks/:taskId', async (req: Request, res: Response) => {
-  try {
-    const { taskId } = req.params;
-    const task = await queue.getTask(taskId);
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-    res.json(task);
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.get('/config', async (req: Request, res: Response) => {
-  try {
-    const configs = await queueService.getAllQueueConfigs();
-    res.json(configs);
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.get('/config/:queueName', async (req: Request, res: Response) => {
-  try {
-    const { queueName } = req.params;
-    const config = await queueService.getQueueConfig(queueName);
-    if (!config) {
-      return res.status(404).json({ error: 'Queue config not found' });
-    }
-    res.json(config);
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.put('/config/:queueName', async (req: Request, res: Response) => {
-  try {
-    const { queueName } = req.params;
-    const updates = req.body;
-    
-    await queueService.updateQueueConfig(queueName, updates);
-    
-    if (updates.consumerCount !== undefined) {
-      await queue.scaleQueue(queueName, updates.consumerCount);
-    }
-    
-    res.json({ message: 'Queue config updated successfully' });
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.post('/scale/:queueName', async (req: Request, res: Response) => {
-  try {
-    const { queueName } = req.params;
-    const { consumerCount } = req.body;
-    
-    await queue.scaleQueue(queueName, consumerCount);
-    
-    res.json({ message: `Scaled queue ${queueName} to ${consumerCount} consumers` });
-  } catch (error) {
-    res.status(500).json({ error: String(error) });
-  }
-});
-
-router.post('/cleanup', async (req: Request, res: Response) => {
-  try {
-    const { days } = req.body;
-    await queueService.cleanupOldTasks(days || 7);
-    res.json({ message: 'Old tasks cleaned up successfully' });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }

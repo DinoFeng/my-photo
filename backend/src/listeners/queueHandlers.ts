@@ -1,4 +1,3 @@
-import { queue } from '../instances/queue'
 import { monitorService } from '../instances/sse'
 import { startScan } from '../services/scanService'
 import { processImport } from '../services/importService'
@@ -8,6 +7,14 @@ import {
   processSourceFileChanged, 
   processSourceFileRemoved 
 } from '../services/sourceFileProcessor'
+import {
+  scanFanout,
+  importFanout,
+  exportFanout,
+  sourceFileAddFanout,
+  sourceFileChangeFanout,
+  sourceFileRemoveFanout
+} from '../instances/fanoutQueues'
 
 const broadcastTask = (event: string, type: string, payload: any, error?: string) => {
   monitorService.broadcast({ 
@@ -16,7 +23,27 @@ const broadcastTask = (event: string, type: string, payload: any, error?: string
   });
 };
 
-queue.bindConsumer('scan', async (payload) => {
+interface ScanPayload {
+  sourceDirectoryId: string;
+}
+
+interface ImportPayload {
+  importPath: string;
+  sourceDirectoryId: string;
+}
+
+interface ExportPayload {
+  mediaIds: string[];
+  exportPath: string;
+  organizePattern?: string;
+}
+
+interface SourceFilePayload {
+  filePath: string;
+  sourceDirId: string;
+}
+
+scanFanout.register('scan-primary', async (payload: ScanPayload) => {
   console.log(`[Queue] Task started: scan`, payload);
   broadcastTask('task-start', 'scan', payload);
   try {
@@ -28,7 +55,7 @@ queue.bindConsumer('scan', async (payload) => {
   }
 })
 
-queue.bindConsumer('import-file', async (payload) => {
+importFanout.register('import-primary', async (payload: ImportPayload) => {
   console.log(`[Queue] Task started: import-file`, payload);
   broadcastTask('task-start', 'import-file', payload);
   try {
@@ -40,7 +67,7 @@ queue.bindConsumer('import-file', async (payload) => {
   }
 })
 
-queue.bindConsumer('export', async (payload) => {
+exportFanout.register('export-primary', async (payload: ExportPayload) => {
   console.log(`[Queue] Task started: export`, payload);
   broadcastTask('task-start', 'export', payload);
   try {
@@ -52,7 +79,7 @@ queue.bindConsumer('export', async (payload) => {
   }
 })
 
-queue.bindConsumers('source-file-add', async (payload) => {
+sourceFileAddFanout.register('source-file-add-primary', async (payload: SourceFilePayload) => {
   console.log(`[Queue] Task started: source-file-add`, payload);
   broadcastTask('task-start', 'source-file-add', payload);
   try {
@@ -62,9 +89,9 @@ queue.bindConsumers('source-file-add', async (payload) => {
     broadcastTask('task-error', 'source-file-add', payload, String(error));
     throw error;
   }
-}, 3)
+})
 
-queue.bindConsumers('source-file-change', async (payload) => {
+sourceFileChangeFanout.register('source-file-change-primary', async (payload: SourceFilePayload) => {
   console.log(`[Queue] Task started: source-file-change`, payload);
   broadcastTask('task-start', 'source-file-change', payload);
   try {
@@ -74,9 +101,9 @@ queue.bindConsumers('source-file-change', async (payload) => {
     broadcastTask('task-error', 'source-file-change', payload, String(error));
     throw error;
   }
-}, 2)
+})
 
-queue.bindConsumers('source-file-remove', async (payload) => {
+sourceFileRemoveFanout.register('source-file-remove-primary', async (payload: SourceFilePayload) => {
   console.log(`[Queue] Task started: source-file-remove`, payload);
   broadcastTask('task-start', 'source-file-remove', payload);
   try {
@@ -86,4 +113,14 @@ queue.bindConsumers('source-file-remove', async (payload) => {
     broadcastTask('task-error', 'source-file-remove', payload, String(error));
     throw error;
   }
-}, 2)
+})
+
+export function startAllQueues(): void {
+  scanFanout.startAll();
+  importFanout.startAll();
+  exportFanout.startAll();
+  sourceFileAddFanout.startAll();
+  sourceFileChangeFanout.startAll();
+  sourceFileRemoveFanout.startAll();
+  console.log('[Queue] All queues started');
+}
