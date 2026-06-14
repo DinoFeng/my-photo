@@ -1,4 +1,4 @@
-import { EventFanoutManager } from '../services/fanoutManager';
+import { EventFanoutManager } from '../services/eventFanoutManager';
 import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
 import path from 'path';
 
