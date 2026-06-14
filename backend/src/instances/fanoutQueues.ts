@@ -1,17 +1,44 @@
-import { EventFanoutManager } from '../services/EventFanoutManager';
+import { EventFanoutManager } from '../services/fanoutManager';
+import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
 import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
 
 export const scanFanout = new EventFanoutManager('scan', [
   {
-    name: 'scan-primary',
+    name: 'scan-folder',
     options: {
-      backend: { type: 'file', filePath: path.join(dataDir, 'scan-primary.json') },
+      backend: {
+        type: 'custom',
+        repository: new SqliteQueueRepository(
+          path.join(dataDir, 'scan-folder.db'),
+          'scan_tasks',
+          3,
+          60000
+        )
+      },
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 60000,
       concurrency: 1
+    }
+  },
+  {
+    name: 'read-file',
+    options: {
+      backend: {
+        type: 'custom',
+        repository: new SqliteQueueRepository(
+          path.join(dataDir, 'read-file.db'),
+          'read_file_tasks',
+          3,
+          120000
+        )
+      },
+      delay: 1000,
+      maxRetries: 3,
+      maxProcessingTime: 120000,
+      concurrency: 2
     }
   }
 ]);
