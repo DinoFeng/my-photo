@@ -5,11 +5,6 @@ import { db as drizzleDb } from './db'
 import apiRoutes from './routes'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
 import { accessLogger, errorLogger } from './middleware/loggerMiddleware'
-import { initSourceDirectories } from './services/initService'
-import { startWatchersForAllSourceDirs } from './services/fileWatcherService'
-
-import './listeners/queueHandlers'
-import { registerEventHandlers } from './listeners/eventHandlers'
 
 dotenv.config()
 
@@ -33,16 +28,6 @@ app.use(notFoundHandler)
 app.use(errorLogger)
 app.use(errorHandler)
 
-registerEventHandlers()
-
-async function startServer() {
-  await initSourceDirectories()
-  
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`)
-  })
-  
-  startWatchersForAllSourceDirs().catch(console.error)
-}
-
-startServer()
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
