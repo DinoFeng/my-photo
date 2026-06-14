@@ -1,11 +1,12 @@
 import fs from 'fs'
 import { eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import { db as drizzleDb } from '../db'
+import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint } from '../db/schema'
 import { scanFanout, ScanPayload } from '../instances/fanoutQueues'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
+const PUBLISH_BATCH = 50
 
 /**
  * 获取文件所属的源目录路径
@@ -32,7 +33,6 @@ export async function hasDirectoryChanged(dirPath: string): Promise<boolean> {
   try {
     const stat = await fs.promises.stat(dirPath)
     const currentMtime = stat.mtimeMs
-    stat.
     const records = await drizzleDb
       .select()
       .from(scanCheckpoint)
@@ -81,56 +81,41 @@ async function getOrCreateScanCheckpoint(dirPath: string, isRoot: boolean): Prom
 }
 
 /**
- * 更新 scanCheckpoint 记录（保存当前 mtime）
+ * 发布目录内容到扫描队列，并更新 checkpoint
  */
-async function updateScanCheckpoint(dirPath: string): Promise<void> {
+async function publishDirectory(dirPath: string): Promise<void> {
+  const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
+
+  const payloads: ScanPayload[] = entries.map((entry) => ({
+    currentPath: `${dirPath}/${entry.name}`,
+    type: entry.isDirectory() ? 'directory' : 'file',
+  }))
+
   const stat = await fs.promises.stat(dirPath)
   const now = new Date().toISOString()
-  
+
   await drizzleDb
     .update(scanCheckpoint)
     .set({
       lastScannedMtime: stat.mtimeMs,
-      lastScannedFile: now,
       status: 'completed',
-      updatedAt: now
+      updatedAt: now,
     })
     .where(eq(scanCheckpoint.path, dirPath))
-}
 
-/**
- * 发布目录到扫描队列
- */
-async function publishDirectory(dirPath: string): Promise<void> {
-  const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
-  
-  for (const entry of entries) {
-    const fullPath = `${dirPath}/${entry.name}`
-    const isDir = entry.isDirectory()
-    
-    let fileSize: number | undefined
-    let mtime: number | undefined
-    
-    if (!isDir) {
-      const stat = await fs.promises.stat(fullPath)
-      fileSize = stat.size
-      mtime = stat.mtimeMs
-    }
-    
-    const payload: ScanPayload = {
-      currentPath: fullPath,
-      type: isDir ? 'directory' : 'file',
-      fileSize,
-      mtime
-    }
-    
-    await scanFanout.publish(payload)
+  for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
+    const batch = payloads.slice(i, i + PUBLISH_BATCH)
+    await Promise.all(batch.map((p) => scanFanout.publish(p)))
   }
+
+  console.log(
+    `[ScanService] Published ${payloads.length} entries from: ${dirPath}`
+  )
 }
 
 /**
  * 扫描目录并发布所有子项到队列
- * 返回是否成功扫描
+ * 返回是否成功扫描（有变化并已发布）
  */
 export async function scanDirectory(dirPath: string): Promise<boolean> {
   const changed = await hasDirectoryChanged(dirPath)
@@ -138,15 +123,15 @@ export async function scanDirectory(dirPath: string): Promise<boolean> {
     console.log(`[ScanService] Directory not changed, skipping: ${dirPath}`)
     return false
   }
-  
-  const isRoot = dirPath.startsWith(MEDIA_PATH) && 
+
+  const isRoot =
+    dirPath.startsWith(MEDIA_PATH) &&
     dirPath.split('/').length === MEDIA_PATH.split('/').length + 1
-  
+
   await getOrCreateScanCheckpoint(dirPath, isRoot)
-  
+
   console.log(`[ScanService] Scanning directory: ${dirPath}`)
   await publishDirectory(dirPath)
-  await updateScanCheckpoint(dirPath)
-  
+
   return true
 }

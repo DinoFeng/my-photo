@@ -1,12 +1,10 @@
 import fs from 'fs'
 import path from 'path'
 import { scanDirectory } from '../services/scanService'
+import { createFileWatcher } from '../listeners/fileWatcher'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 
-/**
- * 获取 media 目录下的直接子目录（挂载点）
- */
 async function getMediaSubDirectories(): Promise<string[]> {
   try {
     const entries = await fs.promises.readdir(MEDIA_PATH, { withFileTypes: true })
@@ -19,31 +17,6 @@ async function getMediaSubDirectories(): Promise<string[]> {
   }
 }
 
-/**
- * 监听目录变化
- */
-function watchDirectory(dirPath: string): void {
-  const watcher = fs.watch(dirPath, { recursive: true }, async (eventType, filename) => {
-    if (filename) {
-      console.log(`[Watcher] ${eventType}: ${path.join(dirPath, filename)}`)
-      try {
-        await scanDirectory(dirPath)
-      } catch (error) {
-        console.error(`[Watcher] 扫描目录失败: ${error}`)
-      }
-    }
-  })
-
-  watcher.on('error', (error) => {
-    console.error(`[Watcher] 监听失败: ${dirPath}, 错误: ${error}`)
-  })
-
-  console.log(`[Watcher] 已启动目录监听: ${dirPath}`)
-}
-
-/**
- * 启动时检查 media 目录下所有挂载的子目录，并发布扫描任务
- */
 export async function checkAndPublishChangedDirectories(): Promise<void> {
   console.log('[Startup] 检查 media 目录变化...')
 
@@ -56,13 +29,11 @@ export async function checkAndPublishChangedDirectories(): Promise<void> {
 
   console.log(`[Startup] 找到 ${subDirs.length} 个子目录`)
 
-  // 先启动所有目录监听
   console.log('[Startup] 启动目录监听...')
   for (const dirPath of subDirs) {
-    watchDirectory(dirPath)
+    createFileWatcher(dirPath)
   }
 
-  // 然后扫描目录
   console.log('[Startup] 开始扫描目录...')
   for (const dirPath of subDirs) {
     await scanDirectory(dirPath)

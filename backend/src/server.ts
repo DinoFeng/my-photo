@@ -1,12 +1,14 @@
 import express, { Express } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { db as drizzleDb } from './db'
-import apiRoutes from './routes'
+import { db as drizzleDb } from './db/index'
+import apiRoutes from './routes/index'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
 import { accessLogger, errorLogger } from './middleware/loggerMiddleware'
+import { ensureDatabaseReady } from './services/dbInitService'
 import { checkAndPublishChangedDirectories } from './services/startupService'
 import { startAllQueues } from './listeners/queueHandlers'
+import { registerEventHandlers } from './listeners/eventHandlers'
 
 dotenv.config()
 
@@ -32,6 +34,8 @@ app.use(errorHandler)
 
 app.listen(PORT, async () => {
   console.log(`[Server] Running on port ${PORT}`)
+  await ensureDatabaseReady()
+  registerEventHandlers()
   startAllQueues()
   await checkAndPublishChangedDirectories()
 })

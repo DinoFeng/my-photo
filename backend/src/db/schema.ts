@@ -48,26 +48,3 @@ export const scanCheckpoint = sqliteTable('scan_checkpoint', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 })
-
-export const taskQueue = sqliteTable('task_queue', {
-  id: text('id').primaryKey(),
-  type: text('type').notNull(),
-  payload: text('payload').notNull(),
-  status: text('status').default('pending'),
-  consumerId: text('consumer_id'),
-  retryCount: integer('retry_count').default(0),
-  maxRetries: integer('max_retries').default(3),
-  priority: integer('priority').default(0),
-  createdAt: text('created_at').notNull(),
-  updatedAt: text('updated_at').notNull()
-})
-
-export const queueConfig = sqliteTable('queue_config', {
-  name: text('name').primaryKey(),
-  consumerCount: integer('consumer_count').default(1),
-  enabled: integer('enabled', { mode: 'boolean' }).default(true),
-  pollingInterval: integer('polling_interval').default(1000),
-  maxConcurrentTasks: integer('max_concurrent_tasks').default(10),
-  createdAt: text('created_at').notNull(),
-  updatedAt: text('updated_at').notNull()
-})

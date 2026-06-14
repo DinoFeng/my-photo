@@ -17,7 +17,7 @@ export function startAllQueues(): void {
   scanFanout.startAll()
 }
 
-// scan-folder 队列：收到目录消息后检查变化，有变化则扫描并发布子项
+// scan-folder 队列：收到目录消息后检查变化，有变化则扫描并发布子�?
 scanFanout.register('scan-folder', async (payload: ScanPayload) => {
   console.log(`[Queue: scan-folder] Processing:`, payload);
   broadcastTask('task-start', 'scan-folder', payload);
