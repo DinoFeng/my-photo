@@ -6,6 +6,7 @@ type HandlerMap = Record<string, Handler>;
 
 export class EventFanoutManager<H extends HandlerMap = HandlerMap> {
   private queues: Map<string, QueueManager<H>> = new Map();
+  private concurrencyMap: Map<string, number | undefined> = new Map();
   private readonly taskName: string;
 
   constructor(taskName: string, queueConfigs: SubscriberQueueConfig[]) {
@@ -13,6 +14,7 @@ export class EventFanoutManager<H extends HandlerMap = HandlerMap> {
     for (const config of queueConfigs) {
       const queue = QueueManager.getInstance<H>(config.options);
       this.queues.set(config.name, queue);
+      this.concurrencyMap.set(config.name, config.options.concurrency);
     }
   }
 
@@ -42,8 +44,9 @@ export class EventFanoutManager<H extends HandlerMap = HandlerMap> {
   }
 
   startAll(): void {
-    for (const queue of this.queues.values()) {
-      queue.startWorker();
+    for (const [name, queue] of this.queues) {
+      const concurrency = this.concurrencyMap.get(name);
+      queue.startWorker(concurrency);
     }
   }
 

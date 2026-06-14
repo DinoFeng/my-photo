@@ -2,12 +2,12 @@ import chokidar from 'chokidar';
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
-import {
-  sourceFileAddFanout,
-  sourceFileChangeFanout,
-  sourceFileRemoveFanout,
-  importFanout
-} from '../instances/fanoutQueues';
+// import {
+//   sourceFileAddFanout,
+//   sourceFileChangeFanout,
+//   sourceFileRemoveFanout,
+//   importFanout
+// } from '../instances/fanoutQueues';
 import { monitorService } from '../instances/sse';
 import { scanDirectory } from '../utils/fileUtils';
 
@@ -37,40 +37,43 @@ export async function startSourceDirWatcher(sourceDirId: string, watchPath: stri
   watcher.on('add', async (filePath: string) => {
     console.log(`[Watch] File added: ${filePath}`);
     monitorService.broadcast({ event: 'file-add', data: { filePath, sourceDirId } });
-    try {
-      await sourceFileAddFanout.publish({ 
-        filePath, 
-        sourceDirId 
-      });
-    } catch (error) {
-      console.error('Error queueing added file:', error);
-    }
+    // TODO: 暂时禁用队列，待后续启用
+    // try {
+    //   await sourceFileAddFanout.publish({ 
+    //     filePath, 
+    //     sourceDirId 
+    //   });
+    // } catch (error) {
+    //   console.error('Error queueing added file:', error);
+    // }
   });
 
   watcher.on('change', async (filePath: string) => {
     console.log(`[Watch] File changed: ${filePath}`);
     monitorService.broadcast({ event: 'file-change', data: { filePath, sourceDirId } });
-    try {
-      await sourceFileChangeFanout.publish({ 
-        filePath, 
-        sourceDirId 
-      });
-    } catch (error) {
-      console.error('Error queueing changed file:', error);
-    }
+    // TODO: 暂时禁用队列，待后续启用
+    // try {
+    //   await sourceFileChangeFanout.publish({ 
+    //     filePath, 
+    //     sourceDirId 
+    //   });
+    // } catch (error) {
+    //   console.error('Error queueing changed file:', error);
+    // }
   });
 
   watcher.on('unlink', async (filePath: string) => {
     console.log(`[Watch] File removed: ${filePath}`);
     monitorService.broadcast({ event: 'file-remove', data: { filePath, sourceDirId } });
-    try {
-      await sourceFileRemoveFanout.publish({ 
-        filePath, 
-        sourceDirId 
-      });
-    } catch (error) {
-      console.error('Error queueing removed file:', error);
-    }
+    // TODO: 暂时禁用队列，待后续启用
+    // try {
+    //   await sourceFileRemoveFanout.publish({ 
+    //     filePath, 
+    //     sourceDirId 
+    //   });
+    // } catch (error) {
+    //   console.error('Error queueing removed file:', error);
+    // }
   });
 
   watchers.set(sourceDirId, { watcher, sourceDirId, path: watchPath, type: 'source' });
@@ -101,11 +104,12 @@ export async function startImportDirWatcher(importPath: string): Promise<void> {
   watcher.on('add', async (filePath: string) => {
     console.log(`[Watch] Import file detected: ${filePath}`);
     monitorService.broadcast({ event: 'import-file-add', data: { filePath } });
-    try {
-      await importFanout.publish({ filePath, sourceDirectoryId: '' });
-    } catch (error) {
-      console.error('Error queueing import file:', error);
-    }
+    // TODO: 暂时禁用队列，待后续启用
+    // try {
+    //   await importFanout.publish({ filePath, sourceDirectoryId: '' });
+    // } catch (error) {
+    //   console.error('Error queueing import file:', error);
+    // }
   });
 
   watchers.set('import', { watcher, sourceDirId: 'import', path: importPath, type: 'import' });
@@ -224,19 +228,20 @@ export async function detectAndProcessNewFiles(sourceDirId: string, watchPath: s
     });
 
     let processed = 0;
-    for (const filePath of newFiles) {
-      try {
-        await sourceFileAddFanout.publish({ filePath, sourceDirId });
-        processed++;
-        scanProgressMap.set(sourceDirId, {
-          ...scanProgressMap.get(sourceDirId)!,
-          processedFiles: processed
-        });
-        console.log(`[Detect] Queued new file: ${filePath}`);
-      } catch (error) {
-        console.error(`Error queueing new file ${filePath}:`, error);
-      }
-    }
+    // TODO: 暂时禁用队列，待后续启用
+    // for (const filePath of newFiles) {
+    //   try {
+    //     await sourceFileAddFanout.publish({ filePath, sourceDirId });
+    //     processed++;
+    //     scanProgressMap.set(sourceDirId, {
+    //       ...scanProgressMap.get(sourceDirId)!,
+    //       processedFiles: processed
+    //     });
+    //     console.log(`[Detect] Queued new file: ${filePath}`);
+    //   } catch (error) {
+    //     console.error(`Error queueing new file ${filePath}:`, error);
+    //   }
+    // }
 
     scanProgressMap.set(sourceDirId, {
       ...scanProgressMap.get(sourceDirId)!,

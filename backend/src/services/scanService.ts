@@ -2,7 +2,7 @@ import { db } from '../db'
 import { sourceDirectory, media, scanCheckpoint } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { scanDirectoryNonRecursive, calculateFileHash, isMediaFile } from '../utils/fileUtils'
-import { scanFanout, sourceFileAddFanout, sourceFileChangeFanout } from '../instances/fanoutQueues'
+import { scanFanout } from '../instances/fanoutQueues'
 import { v4 as uuidv4 } from 'uuid'
 import { eventBus } from '../instances/eventBus'
 import fs from 'fs'
@@ -119,7 +119,8 @@ export async function startScan(sourceDirectoryId: string): Promise<void> {
 }
 
 async function processSubDirectory(dirPath: string, parentSourceDirectoryId: string): Promise<void> {
-  await scanFanout.publish({ sourceDirectoryId: parentSourceDirectoryId })
+  // TODO: 暂时禁用队列，待后续启用
+  // await scanFanout.publish({ sourceDirectoryId: parentSourceDirectoryId })
 }
 
 async function processFile(filePath: string, sourceDirectoryId: string): Promise<void> {
@@ -128,11 +129,13 @@ async function processFile(filePath: string, sourceDirectoryId: string): Promise
   const existingMedia = existingMediaResult[0]
 
   if (!existingMedia) {
-    await sourceFileAddFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
+    // TODO: 暂时禁用队列，待后续启用
+    // await sourceFileAddFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
   } else {
     const currentHash = await calculateFileHash(filePath)
     if (existingMedia.hash !== currentHash) {
-      await sourceFileChangeFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
+      // TODO: 暂时禁用队列，待后续启用
+      // await sourceFileChangeFanout.publish({ filePath, sourceDirId: sourceDirectoryId })
     }
   }
 }

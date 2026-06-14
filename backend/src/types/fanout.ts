@@ -8,6 +8,7 @@ export interface QueueConfig {
   maxProcessingTime?: number;
   logger?: any;
   crashOnWorkerError?: boolean;
+  concurrency?: number;
 }
 
 export interface SubscriberQueueConfig {

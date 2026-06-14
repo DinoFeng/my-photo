@@ -3,31 +3,18 @@ import { getWatcherStatus, getScanProgress } from '../services/fileWatcherServic
 import { db } from '../db';
 import { sourceDirectory, media } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import {
-  scanFanout,
-  importFanout,
-  exportFanout,
-  sourceFileAddFanout,
-  sourceFileChangeFanout,
-  sourceFileRemoveFanout
-} from '../instances/fanoutQueues';
+import { scanFanout } from '../instances/fanoutQueues';
 
 const router: Router = Router();
-
-const fanoutMap = [scanFanout, importFanout, exportFanout, sourceFileAddFanout, sourceFileChangeFanout, sourceFileRemoveFanout];
 
 router.get('/status', async (_req, res) => {
   try {
     const watcherStatus = getWatcherStatus();
     
-    const allTasks = await Promise.all(
-      fanoutMap.map(async (fanout) => {
-        const queue = fanout.getQueue(fanout.getQueueNames()[0]);
-        return queue.getAllTasks();
-      })
-    );
-    const tasks = allTasks.flat();
-    const activeTasks = tasks.filter((t: { status: string }) => t.status === 'pending' || t.status === 'processing').length;
+    // 只获取 scan 队列状态
+    const scanQueue = scanFanout.getQueue(scanFanout.getQueueNames()[0]);
+    const scanTasks = await scanQueue.getAllTasks();
+    const activeTasks = scanTasks.filter((t: { status: string }) => t.status === 'pending' || t.status === 'processing').length;
     
     const sourceDirsResult = await db.select().from(sourceDirectory);
     const sourceDirsCount = sourceDirsResult.length;
@@ -40,7 +27,7 @@ router.get('/status', async (_req, res) => {
       timestamp: new Date().toISOString(),
       watchers: watcherStatus,
       tasks: {
-        total: tasks.length,
+        total: scanTasks.length,
         active: activeTasks
       },
       database: {
