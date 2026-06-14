@@ -4,7 +4,14 @@ import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
 
-export const scanFanout = new EventFanoutManager('scan', [
+export interface ScanPayload {
+  currentPath: string;
+  type: 'directory' | 'file';
+  fileSize?: number;
+  mtime?: number;
+}
+
+export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
   {
     name: 'scan-folder',
     options: {

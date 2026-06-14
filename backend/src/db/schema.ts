@@ -1,18 +1,8 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
-export const sourceDirectory = sqliteTable('source_directory', {
-  id: text('id').primaryKey(),
-  path: text('path').unique().notNull(),
-  name: text('name').notNull(),
-  enabled: integer('enabled', { mode: 'boolean' }).default(true),
-  lastScanned: text('last_scanned'),
-  createdAt: text('created_at').notNull(),
-  updatedAt: text('updated_at').notNull()
-})
-
 export const media = sqliteTable('media', {
   id: text('id').primaryKey(),
-  sourceDirectoryId: text('source_directory_id').notNull(),
+  sourcePath: text('source_path').notNull(),  // 源目录路径
   filename: text('filename').notNull(),
   filepath: text('filepath').notNull(),
   fileSize: integer('file_size').notNull(),
@@ -44,7 +34,9 @@ export const setting = sqliteTable('setting', {
 
 export const scanCheckpoint = sqliteTable('scan_checkpoint', {
   id: text('id').primaryKey(),
-  sourceDirectoryId: text('source_directory_id').unique().notNull(),
+  path: text('path').unique().notNull(),  // 目录路径（唯一）
+  isRoot: integer('is_root', { mode: 'boolean' }).default(false),  // 是否顶层目录
+  lastScannedMtime: integer('last_scanned_mtime'),  // 上次扫描时的目录 mtime
   lastScannedFile: text('last_scanned_file'),
   status: text('status').default('idle'),
   progress: real('progress').default(0),
