@@ -45,8 +45,7 @@ scanFanout.register('read-file', async (payload: ScanPayload) => {
         if (!sourcePath) {
           console.log(`[Queue: read-file] No source directory found for: ${payload.currentPath}`)
         } else {
-          console.log(`[Queue: read-file] Media file found, will import: ${payload.currentPath}, sourcePath: ${sourcePath}`)
-          // TODO: 调用 mediaService 入库逻辑，使用 sourcePath
+          console.log(`[Queue: read-file] Media file found, pending import: ${payload.currentPath}, sourcePath: ${sourcePath}`)
         }
       } else {
         console.log(`[Queue: read-file] Not a media file, skipping: ${payload.currentPath}`)
