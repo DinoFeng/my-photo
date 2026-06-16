@@ -14,6 +14,14 @@ export async function calculateFileHash(filePath: string): Promise<string> {
   })
 }
 
+function parseExifDate(dateStr: string): Date | null {
+  const normalized = dateStr
+    .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')  // "2024:01:15" → "2024-01-15"
+    .replace(' ', 'T')                                   // "10:30:00" 前加 T
+  const d = new Date(normalized)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export async function getFileMetadata(filePath: string): Promise<{
   width?: number
   height?: number
@@ -46,9 +54,13 @@ export async function getFileMetadata(filePath: string): Promise<{
     if (tags['Model']) result.model = tags['Model'].description
     
     if (tags['DateTimeOriginal']) {
-      result.dateTaken = new Date(tags['DateTimeOriginal'].description)
-    } else if (tags['DateTime']) {
-      result.dateTaken = new Date(tags['DateTime'].description)
+      result.dateTaken = parseExifDate(String(tags['DateTimeOriginal'].description)) ?? undefined
+    }
+    if (!result.dateTaken && tags['DateTimeDigitized']) {
+      result.dateTaken = parseExifDate(String(tags['DateTimeDigitized'].description)) ?? undefined
+    }
+    if (!result.dateTaken && tags['DateTime']) {
+      result.dateTaken = parseExifDate(String(tags['DateTime'].description)) ?? undefined
     }
 
     if (tags['GPSLatitude'] && tags['GPSLongitude']) {
@@ -92,68 +104,4 @@ export function isMediaFile(filePath: string): boolean {
     '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.heif',
     '.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'
   ].includes(ext)
-}
-
-export async function scanDirectory(dirPath: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const files: string[] = []
-    
-    function scan(currentPath: string) {
-      fs.readdir(currentPath, { withFileTypes: true }, (err, entries) => {
-        if (err) return reject(err)
-        
-        let pending = entries.length
-        if (pending === 0) return resolve(files)
-        
-        entries.forEach((entry) => {
-          const fullPath = path.join(currentPath, entry.name)
-          if (entry.isDirectory()) {
-            scan(fullPath)
-            pending--
-          } else if (entry.isFile() && isMediaFile(fullPath)) {
-            files.push(fullPath)
-            pending--
-          } else {
-            pending--
-          }
-          
-          if (pending === 0) resolve(files)
-        })
-      })
-    }
-    
-    scan(dirPath)
-  })
-}
-
-export interface ScannedItem {
-  type: 'directory' | 'file'
-  path: string
-}
-
-export async function scanDirectoryNonRecursive(dirPath: string): Promise<ScannedItem[]> {
-  return new Promise((resolve, reject) => {
-    fs.readdir(dirPath, { withFileTypes: true }, (err, entries) => {
-      if (err) return reject(err)
-      
-      const result: ScannedItem[] = []
-      
-      entries.forEach((entry) => {
-        const fullPath = path.join(dirPath, entry.name)
-        if (entry.isDirectory()) {
-          result.push({
-            type: 'directory',
-            path: fullPath
-          })
-        } else if (entry.isFile() && isMediaFile(fullPath)) {
-          result.push({
-            type: 'file',
-            path: fullPath
-          })
-        }
-      })
-      
-      resolve(result)
-    })
-  })
 }

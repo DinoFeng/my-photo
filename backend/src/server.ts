@@ -6,7 +6,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddlewa
 import { accessLogger, errorLogger } from './middleware/loggerMiddleware'
 import { ensureDatabaseReady } from './services/dbInitService'
 import { checkAndPublishChangedDirectories } from './services/startupService'
-import { startAllQueues } from './listeners/queueHandlers'
+import { startAllQueues } from './instances/fanoutQueues'
+import './listeners/queueHandlers'
 import { registerEventHandlers } from './listeners/eventHandlers'
 import { monitorService } from './instances/sse'
 

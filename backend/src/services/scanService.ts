@@ -11,25 +11,6 @@ const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 const PUBLISH_BATCH = 50
 
 /**
- * 获取文件所属的源目录路径
- */
-export async function findSourceDirectory(filePath: string): Promise<string | null> {
-  const rootDirs = await drizzleDb
-    .select()
-    .from(scanCheckpoint)
-    .where(eq(scanCheckpoint.isRoot, true))
-  
-  for (const dir of rootDirs) {
-    const relative = path.relative(dir.path, filePath)
-    if (relative && !relative.startsWith('..')) {
-      return dir.path
-    }
-  }
-  
-  return null
-}
-
-/**
  * 检查目录是否有变化（当前 mtime > 上次扫描时记录的 mtime）
  */
 async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean; exists: boolean }> {
@@ -93,6 +74,7 @@ async function processDirectory(dirPath: string): Promise<void> {
     const payloads: ScanPayload[] = entries.map((entry) => ({
       currentPath: path.join(dirPath, entry.name),
       type: entry.isDirectory() ? 'directory' : 'file',
+      sourcePath: dirPath,
     }))
 
     for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
@@ -167,4 +149,9 @@ export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
   await drizzleDb.delete(scanCheckpoint).where(like(scanCheckpoint.path, likePath))
 
   console.log(`[ScanService] Cleaned up records for deleted directory: ${dirPath}`)
+}
+
+export async function processScanFolder(payload: ScanPayload): Promise<void> {
+  if (payload.type !== 'directory') return
+  await scanDirectory(payload.currentPath)
 }

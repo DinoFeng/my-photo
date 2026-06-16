@@ -7,6 +7,7 @@ const dataDir = path.join(process.cwd(), 'data');
 export interface ScanPayload {
   currentPath: string;
   type: 'directory' | 'file';
+  sourcePath: string;
   fileSize?: number;
   mtime?: number;
 }
@@ -15,6 +16,7 @@ export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
   {
     name: 'scan-folder',
     options: {
+      singleton: false,
       backend: {
         type: 'custom',
         repository: new SqliteQueueRepository(
@@ -27,12 +29,14 @@ export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 60000,
-      concurrency: 1
+      concurrency: 1,
+      logger: console
     }
   },
   {
     name: 'read-file',
     options: {
+      singleton: false,
       backend: {
         type: 'custom',
         repository: new SqliteQueueRepository(
@@ -45,10 +49,15 @@ export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 120000,
-      concurrency: 2
+      concurrency: 2,
+      logger: console
     }
   }
 ]);
+
+export function startAllQueues(): void {
+  scanFanout.startAll()
+}
 
 // export const importFanout = new EventFanoutManager('import-file', [
 //   {
