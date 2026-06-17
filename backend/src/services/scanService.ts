@@ -4,7 +4,7 @@ import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
-import { scanFanout, ScanPayload } from '../instances/fanoutQueues'
+import { folderFanout, fileFanout, ScanPayload } from '../instances/fanoutQueues'
 import { eventBus } from '../instances/eventBus'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
@@ -79,7 +79,9 @@ async function processDirectory(dirPath: string): Promise<void> {
 
     for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
       const batch = payloads.slice(i, i + PUBLISH_BATCH)
-      await Promise.all(batch.map((p) => scanFanout.publish(p)))
+      await Promise.all(batch.map((p) =>
+        p.type === 'directory' ? folderFanout.publish(p) : fileFanout.publish(p)
+      ))
     }
 
     const stat = await fs.promises.stat(dirPath)

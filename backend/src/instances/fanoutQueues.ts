@@ -12,7 +12,7 @@ export interface ScanPayload {
   mtime?: number;
 }
 
-export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
+export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
   {
     name: 'scan-folder',
     options: {
@@ -32,7 +32,10 @@ export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       concurrency: 1,
       logger: console
     }
-  },
+  }
+]);
+
+export const fileFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
   {
     name: 'read-file',
     options: {
@@ -56,7 +59,8 @@ export const scanFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
 ]);
 
 export function startAllQueues(): void {
-  scanFanout.startAll()
+  folderFanout.startAll()
+  fileFanout.startAll()
 }
 
 // export const importFanout = new EventFanoutManager('import-file', [

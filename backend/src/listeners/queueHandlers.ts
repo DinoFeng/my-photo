@@ -1,5 +1,5 @@
 import { broadcastTask } from '../instances/sse'
-import { scanFanout, ScanPayload } from '../instances/fanoutQueues'
+import { folderFanout, fileFanout, ScanPayload } from '../instances/fanoutQueues'
 import { processScanFolder } from '../services/scanService'
 import { processReadFile } from '../services/mediaService'
 
@@ -18,5 +18,5 @@ function createQueueHandler(name: string, process: (payload: ScanPayload) => Pro
   }
 }
 
-scanFanout.register('scan-folder', createQueueHandler('scan-folder', processScanFolder))
-scanFanout.register('read-file', createQueueHandler('read-file', processReadFile))
+folderFanout.register('scan-folder', createQueueHandler('scan-folder', processScanFolder))
+fileFanout.register('read-file', createQueueHandler('read-file', processReadFile))
