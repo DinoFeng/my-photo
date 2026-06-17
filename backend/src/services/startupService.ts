@@ -3,6 +3,7 @@ import path from 'path'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint } from '../db/schema'
 import { scanDirectory } from '../services/scanService'
+import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
@@ -37,7 +38,7 @@ async function scanKnownDirectories(): Promise<void> {
     total += checkpoints.length
 
     await Promise.all(checkpoints.map(cp =>
-      scanDirectory(cp.path).catch((error: any) => {
+      scanDirectory(cp.path, publishScanEntry).catch((error: any) => {
         console.error(`[Startup] 扫描已知目录失败 ${cp.path}:`, error.message)
       })
     ))
@@ -70,7 +71,7 @@ export async function checkAndPublishChangedDirectories(): Promise<void> {
 
   console.log('[Startup] 补充扫描新目录...')
   for (const dirPath of subDirs) {
-    await scanDirectory(dirPath)
+    await scanDirectory(dirPath, publishScanEntry)
   }
 
   console.log('[Startup] media 目录检查完成')

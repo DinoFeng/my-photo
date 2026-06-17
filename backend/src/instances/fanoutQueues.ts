@@ -63,6 +63,14 @@ export function startAllQueues(): void {
   fileFanout.startAll()
 }
 
+export async function publishScanEntry(payload: ScanPayload): Promise<void> {
+  if (payload.type === 'directory') {
+    await folderFanout.publish(payload)
+  } else {
+    await fileFanout.publish(payload)
+  }
+}
+
 // export const importFanout = new EventFanoutManager('import-file', [
 //   {
 //     name: 'import-primary',

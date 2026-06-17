@@ -4,11 +4,13 @@ import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
-import { folderFanout, fileFanout, ScanPayload } from '../instances/fanoutQueues'
+import type { ScanPayload } from '../instances/fanoutQueues'
 import { eventBus } from '../instances/eventBus'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 const PUBLISH_BATCH = 50
+
+export type PublishFn = (payload: ScanPayload) => Promise<void>
 
 /**
  * 检查目录是否有变化（当前 mtime > 上次扫描时记录的 mtime）
@@ -40,7 +42,7 @@ async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean;
 /**
  * 处理目录：创建 checkpoint、读取内容、发布到队列
  */
-async function processDirectory(dirPath: string): Promise<void> {
+async function processDirectory(dirPath: string, publish: PublishFn): Promise<void> {
   const now = new Date().toISOString()
 
   const existing = await drizzleDb
@@ -79,9 +81,7 @@ async function processDirectory(dirPath: string): Promise<void> {
 
     for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
       const batch = payloads.slice(i, i + PUBLISH_BATCH)
-      await Promise.all(batch.map((p) =>
-        p.type === 'directory' ? folderFanout.publish(p) : fileFanout.publish(p)
-      ))
+      await Promise.all(batch.map((p) => publish(p)))
     }
 
     const stat = await fs.promises.stat(dirPath)
@@ -122,7 +122,7 @@ async function processDirectory(dirPath: string): Promise<void> {
  * 扫描目录并发布所有子项到队列
  * 返回是否成功扫描（有变化并已发布）
  */
-export async function scanDirectory(dirPath: string): Promise<boolean> {
+export async function scanDirectory(dirPath: string, publish: PublishFn): Promise<boolean> {
   const { changed, exists } = await hasDirectoryChanged(dirPath)
 
   if (!exists) {
@@ -137,7 +137,7 @@ export async function scanDirectory(dirPath: string): Promise<boolean> {
   }
 
   console.log(`[ScanService] Scanning directory: ${dirPath}`)
-  await processDirectory(dirPath)
+  await processDirectory(dirPath, publish)
   return true
 }
 
@@ -153,7 +153,7 @@ export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
   console.log(`[ScanService] Cleaned up records for deleted directory: ${dirPath}`)
 }
 
-export async function processScanFolder(payload: ScanPayload): Promise<void> {
+export async function processScanFolder(payload: ScanPayload, publish: PublishFn): Promise<void> {
   if (payload.type !== 'directory') return
-  await scanDirectory(payload.currentPath)
+  await scanDirectory(payload.currentPath, publish)
 }
