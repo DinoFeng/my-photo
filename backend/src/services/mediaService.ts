@@ -2,7 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { eq } from 'drizzle-orm'
-import { ScanPayload } from '../instances/fanoutQueues'
+import type { ScanPayload } from '../types/fanout'
+import type { UpsertResult } from '../types/media'
 import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '../utils/fileUtils'
 import { db } from '../db/index'
 import { media } from '../db/schema'
@@ -51,10 +52,6 @@ function buildMediaData(
   }
 }
 
-type UpsertResult =
-  | { action: 'update'; id: string }
-  | { action: 'insert'; id: string }
-
 async function upsertMedia(
   filepath: string,
   sourcePath: string,
@@ -66,24 +63,71 @@ async function upsertMedia(
       .set(data)
       .where(eq(media.id, existingId))
 
-    return { action: 'update', id: existingId }
+    const [record] = await db.select().from(media).where(eq(media.id, existingId)).limit(1)
+
+    return {
+      action: 'update',
+      id: record.id,
+      sourcePath: record.sourcePath,
+      filename: record.filename,
+      filepath: record.filepath,
+      fileSize: record.fileSize,
+      fileType: record.fileType,
+      hash: record.hash,
+      width: record.width,
+      height: record.height,
+      duration: record.duration,
+      make: record.make,
+      model: record.model,
+      dateTaken: record.dateTaken,
+      latitude: record.latitude,
+      longitude: record.longitude,
+      metadata: record.metadata,
+      thumbnailPath: record.thumbnailPath,
+      status: record.status ?? 'active',
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    }
   }
 
   const id = uuidv4()
+  const now = data.updatedAt
 
   await db.insert(media).values({
     id,
     sourcePath,
     filepath,
     status: 'active',
-    createdAt: data.updatedAt,
+    createdAt: now,
     ...data,
   })
 
-  return { action: 'insert', id }
+  return {
+    action: 'insert',
+    id,
+    sourcePath,
+    filename: data.filename,
+    filepath,
+    fileSize: data.fileSize,
+    fileType: data.fileType,
+    hash: data.hash,
+    width: data.width,
+    height: data.height,
+    duration: data.duration,
+    make: data.make,
+    model: data.model,
+    dateTaken: data.dateTaken,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    metadata: data.metadata,
+    thumbnailPath: null,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  }
 }
 
-export async function processReadFile(payload: ScanPayload): Promise<void> {
+export async function processReadFile(payload: ScanPayload, publish: (result: UpsertResult) => Promise<void>): Promise<void> {
   if (payload.type !== 'file') return
 
   if (!isMediaFile(payload.currentPath)) {
@@ -123,6 +167,8 @@ export async function processReadFile(payload: ScanPayload): Promise<void> {
   console.log(
     `[MediaService] Media file ${result.action === 'insert' ? 'imported' : 'updated'}: ${payload.currentPath}`,
   )
+
+  await publish(result)
 
   if (result.action === 'insert') {
     eventBus.emit('mediaAdded', {

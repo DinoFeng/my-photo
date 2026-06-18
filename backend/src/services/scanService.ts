@@ -4,13 +4,11 @@ import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
-import type { ScanPayload } from '../instances/fanoutQueues'
+import type { ScanPayload, PublishFn } from '../types/fanout'
 import { eventBus } from '../instances/eventBus'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 const PUBLISH_BATCH = 50
-
-export type PublishFn = (payload: ScanPayload) => Promise<void>
 
 /**
  * 检查目录是否有变化（当前 mtime > 上次扫描时记录的 mtime）

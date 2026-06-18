@@ -1,16 +1,10 @@
-import { EventFanoutManager } from '../services/eventFanoutManager';
+import { EventFanoutManager } from '../utils/eventFanoutManager';
 import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
+import type { ScanPayload } from '../types/fanout';
+import type { UpsertResult } from '../types/media';
 import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
-
-export interface ScanPayload {
-  currentPath: string;
-  type: 'directory' | 'file';
-  sourcePath: string;
-  fileSize?: number;
-  mtime?: number;
-}
 
 export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
   {
@@ -71,18 +65,9 @@ export async function publishScanEntry(payload: ScanPayload): Promise<void> {
   }
 }
 
-// export const importFanout = new EventFanoutManager('import-file', [
-//   {
-//     name: 'import-primary',
-//     options: {
-//       backend: { type: 'file', filePath: path.join(dataDir, 'import-primary.json') },
-//       delay: 1000,
-//       maxRetries: 3,
-//       maxProcessingTime: 120000,
-//       concurrency: 2
-//     }
-//   }
-// ]);
+export async function publishImportEntry(_payload: UpsertResult): Promise<void> {
+  // 预留：read-file 完成后发布到下游队列
+}
 
 // export const exportFanout = new EventFanoutManager('export', [
 //   {
