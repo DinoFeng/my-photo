@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
 import type { ScanPayload, PublishFn } from '../types/fanout'
-import { eventBus } from '../instances/eventBus'
+// import { eventBus } from '../instances/eventBus'
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 const PUBLISH_BATCH = 50
@@ -98,10 +98,10 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
       `[ScanService] Published ${payloads.length} entries from: ${dirPath}`
     )
 
-    eventBus.emit('scanProgressUpdated', {
-      sourceDirectoryId: dirPath,
-      checkpoint: { path: dirPath, status: 'completed' },
-    })
+    // eventBus.emit('scanProgressUpdated', {
+    //   sourceDirectoryId: dirPath,
+    //   checkpoint: { path: dirPath, status: 'completed' },
+    // })
   } catch (error: any) {
     await drizzleDb
       .update(scanCheckpoint)

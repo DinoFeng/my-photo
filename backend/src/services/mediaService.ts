@@ -7,7 +7,7 @@ import type { UpsertResult } from '../types/media'
 import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '../utils/fileUtils'
 import { db } from '../db/index'
 import { media } from '../db/schema'
-import { eventBus } from '../instances/eventBus'
+// import { eventBus } from '../instances/eventBus'
 
 interface MediaData {
   filename: string
@@ -171,9 +171,9 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
   await publish(result)
 
   if (result.action === 'insert') {
-    eventBus.emit('mediaAdded', {
-      sourceDirectoryId: payload.sourcePath,
-      mediaItem: { id: result.id, filename, filepath: payload.currentPath, fileType },
-    })
+    // eventBus.emit('mediaAdded', {
+    //   sourceDirectoryId: payload.sourcePath,
+    //   mediaItem: { id: result.id, filename, filepath: payload.currentPath, fileType },
+    // })
   }
 }
