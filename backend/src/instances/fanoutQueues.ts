@@ -4,6 +4,7 @@ import type { ScanPayload } from '../types/fanout';
 import type { UpsertResult } from '../types/media';
 import type { LoggerLike } from 'queue-manager-pro';
 import { appLogger } from '../utils/logging';
+import { dumpActiveSteps } from '../utils/stepTracker';
 import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
@@ -26,7 +27,9 @@ function createQueueLogger(name: string): LoggerLike {
         context.originalCode = (errArg as any).code;
         context.originalName = errArg.name;
       }
-      appLogger.exception(msg, undefined, context);
+      const steps = dumpActiveSteps();
+      const fullMsg = steps ? `${msg} | ${steps}` : msg;
+      appLogger.exception(fullMsg, undefined, context);
     },
     debug(...args: any[]) {
       const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
@@ -52,7 +55,7 @@ export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 60000,
-      concurrency: 10,
+      concurrency: 3,
       logger: createQueueLogger('scan-folder')
     }
   }
@@ -75,7 +78,7 @@ export const fileFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 120000,
-      concurrency: 20,
+      concurrency: 5,
       logger: createQueueLogger('read-file')
     }
   }

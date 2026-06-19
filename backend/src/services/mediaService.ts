@@ -8,6 +8,7 @@ import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '..
 import { db } from '../db/index'
 import { media } from '../db/schema'
 import { appLogger } from '../utils/logging'
+import { setStep, clearStep } from '../utils/stepTracker'
 
 const log = appLogger
 
@@ -142,38 +143,46 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
     return
   }
 
-  const [existing, stat] = await Promise.all([
-    db
-      .select({ id: media.id, hash: media.hash })
-      .from(media)
-      .where(eq(media.filepath, payload.currentPath))
-      .limit(1),
-    fs.promises.stat(payload.currentPath),
-  ])
+  try {
+    setStep(payload.currentPath, 'stat+db')
+    const [existing, stat] = await Promise.all([
+      db
+        .select({ id: media.id, hash: media.hash })
+        .from(media)
+        .where(eq(media.filepath, payload.currentPath))
+        .limit(1),
+      fs.promises.stat(payload.currentPath),
+    ])
 
-  const hash = await calculateFileHash(payload.currentPath)
+    setStep(payload.currentPath, 'hash')
+    const hash = await calculateFileHash(payload.currentPath)
 
-  if (existing[0]?.hash === hash) {
-    log.debug('File unchanged, skipping', { currentPath: payload.currentPath })
-    return
-  }
+    if (existing[0]?.hash === hash) {
+      log.debug('File unchanged, skipping', { currentPath: payload.currentPath })
+      return
+    }
 
-  const metadata = await getFileMetadata(payload.currentPath)
-  const fileType = getFileType(payload.currentPath)
-  const filename = path.basename(payload.currentPath)
-  const now = new Date().toISOString()
+    setStep(payload.currentPath, 'metadata')
+    const metadata = await getFileMetadata(payload.currentPath)
+    const fileType = getFileType(payload.currentPath)
+    const filename = path.basename(payload.currentPath)
+    const now = new Date().toISOString()
 
-  const mediaData = buildMediaData(stat, hash, metadata, fileType, filename, now)
-  const result = await upsertMedia(payload.currentPath, payload.sourcePath, mediaData, existing[0]?.id)
+    setStep(payload.currentPath, 'upsert')
+    const mediaData = buildMediaData(stat, hash, metadata, fileType, filename, now)
+    const result = await upsertMedia(payload.currentPath, payload.sourcePath, mediaData, existing[0]?.id)
 
-  log.info('Media file processed', { action: result.action, currentPath: payload.currentPath })
+    log.info('Media file processed', { action: result.action, currentPath: payload.currentPath })
 
-  await publish(result)
+    await publish(result)
 
-  if (result.action === 'insert') {
-    // eventBus.emit('mediaAdded', {
-    //   sourceDirectoryId: payload.sourcePath,
-    //   mediaItem: { id: result.id, filename, filepath: payload.currentPath, fileType },
-    // })
+    if (result.action === 'insert') {
+      // eventBus.emit('mediaAdded', {
+      //   sourceDirectoryId: payload.sourcePath,
+      //   mediaItem: { id: result.id, filename, filepath: payload.currentPath, fileType },
+      // })
+    }
+  } finally {
+    clearStep(payload.currentPath)
   }
 }

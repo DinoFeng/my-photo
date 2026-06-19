@@ -32,20 +32,34 @@ function formatTime(epoch: number): string {
 
 const PINO_BUILTIN_KEYS = new Set(['level', 'time', 'pid', 'hostname', 'name', 'msg', 'v', 'caller', 'err'])
 
-export function formatLogLine(obj: any): string {
+export const DEFAULT_FORMAT = '{time} - {name} - pid:{pid} - {file}[line:{line}] - {level}: {msg}{extra}{err}'
+
+interface LogParts {
+  time: string
+  name: string
+  pid: string
+  level: string
+  msg: string
+  file: string
+  line: string
+  extra: string
+  err: string
+}
+
+function buildLogParts(obj: any): LogParts {
   const time = formatTime(obj.time)
   const name = obj.name || 'app'
-  const pid = obj.pid
+  const pid = String(obj.pid)
   const level = LEVELS[obj.level] || 'INFO'
   const msg = obj.msg
 
-  let caller = ''
+  let file = ''
+  let line = ''
   if (obj.caller) {
     const lastColon = obj.caller.lastIndexOf(':')
     const filePath = obj.caller.substring(0, lastColon)
-    const line = obj.caller.substring(lastColon + 1) || '?'
-    const file = filePath.replace(/\\/g, '/').split('/').pop() || filePath
-    caller = `${file}[line:${line}]`
+    line = obj.caller.substring(lastColon + 1) || '?'
+    file = filePath.replace(/\\/g, '/').split('/').pop() || filePath
   }
 
   const extra = Object.keys(obj)
@@ -53,27 +67,40 @@ export function formatLogLine(obj: any): string {
     .map((k) => `${k}=${JSON.stringify(obj[k])}`)
     .join(' ')
 
-  let errStack = ''
+  let err = ''
   if (obj.err) {
     const errType = obj.err.type || 'Error'
     const errMsg = obj.err.message || ''
     const stack = obj.err.stack || ''
-    errStack = `\n  ${errType}: ${errMsg}`
+    err = `\n  ${errType}: ${errMsg}`
     if (stack) {
       const stackLines = stack.split('\n')
       for (let i = 1; i < stackLines.length; i++) {
-        errStack += `\n    ${stackLines[i].trim()}`
+        err += `\n    ${stackLines[i].trim()}`
       }
     }
   }
 
-  const color = COLORS[level] || ''
-  const reset = color ? COLORS.RESET : ''
-
-  return `${color}${time} - ${name} - pid:${pid} - ${caller} - ${level}: ${msg}${extra ? ' ' + extra : ''}${errStack}${reset}`
+  return { time, name, pid, level, msg, file, line, extra, err }
 }
 
-export function createConsoleStream(): Writable {
+const TEMPLATE_RE = /\{(time|name|pid|level|msg|file|line|extra|err)\}/g
+
+function applyTemplate(template: string, parts: LogParts): string {
+  return template.replace(TEMPLATE_RE, (_, key: keyof LogParts) => parts[key] ?? '')
+}
+
+export function formatLogLine(obj: any, format?: string): string {
+  const parts = buildLogParts(obj)
+  const result = applyTemplate(format || DEFAULT_FORMAT, parts)
+
+  const color = COLORS[parts.level] || ''
+  const reset = color ? COLORS.RESET : ''
+
+  return `${color}${result}${reset}`
+}
+
+export function createConsoleStream(format?: string): Writable {
   let leftover = ''
 
   return new Writable({
@@ -86,7 +113,7 @@ export function createConsoleStream(): Writable {
         if (!line.trim()) continue
         try {
           const obj = JSON.parse(line)
-          ;(process as any)._rawDebug(formatLogLine(obj))
+          ;(process as any)._rawDebug(formatLogLine(obj, format))
         } catch {
           ;(process as any)._rawDebug(line)
         }
@@ -99,7 +126,7 @@ export function createConsoleStream(): Writable {
       if (leftover) {
         try {
           const obj = JSON.parse(leftover)
-          ;(process as any)._rawDebug(formatLogLine(obj))
+          ;(process as any)._rawDebug(formatLogLine(obj, format))
         } catch {
           ;(process as any)._rawDebug(leftover)
         }

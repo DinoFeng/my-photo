@@ -6,6 +6,7 @@ import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
 import type { ScanPayload, PublishFn } from '../types/fanout'
 import { appLogger } from '../utils/logging'
+import { setStep, clearStep } from '../utils/stepTracker'
 
 const log = appLogger
 
@@ -45,6 +46,7 @@ async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean;
 async function processDirectory(dirPath: string, publish: PublishFn): Promise<void> {
   const now = new Date().toISOString()
 
+  setStep(dirPath, 'checkpoint')
   const existing = await drizzleDb
     .select()
     .from(scanCheckpoint)
@@ -71,6 +73,7 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
   }
 
   try {
+    setStep(dirPath, 'readdir')
     const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
 
     const payloads: ScanPayload[] = entries.map((entry) => ({
@@ -79,11 +82,13 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
       sourcePath: dirPath,
     }))
 
+    setStep(dirPath, 'publish')
     for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
       const batch = payloads.slice(i, i + PUBLISH_BATCH)
       await Promise.all(batch.map((p) => publish(p)))
     }
 
+    setStep(dirPath, 'complete')
     const stat = await fs.promises.stat(dirPath)
 
     await drizzleDb
@@ -113,6 +118,8 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
       .where(eq(scanCheckpoint.path, dirPath))
 
     log.exception('Failed to process directory', error instanceof Error ? error : undefined, { dirPath })
+  } finally {
+    clearStep(dirPath)
   }
 }
 
@@ -153,5 +160,10 @@ export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
 
 export async function processScanFolder(payload: ScanPayload, publish: PublishFn): Promise<void> {
   if (payload.type !== 'directory') return
-  await scanDirectory(payload.currentPath, publish)
+  try {
+    setStep(payload.currentPath, 'scan')
+    await scanDirectory(payload.currentPath, publish)
+  } finally {
+    clearStep(payload.currentPath)
+  }
 }

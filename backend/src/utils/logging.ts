@@ -4,7 +4,7 @@ import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { Transform, Writable } from 'stream'
-import { createConsoleStream, formatLogLine } from './consoleTransport'
+import { createConsoleStream, formatLogLine, DEFAULT_FORMAT } from './consoleTransport'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -103,6 +103,7 @@ export interface HandlerConfig {
   type: 'console' | 'file'
   filename?: string
   level: string
+  format?: string
 }
 
 export interface LoggerConfig {
@@ -111,6 +112,7 @@ export interface LoggerConfig {
 }
 
 export interface LoggingConfig {
+  format?: string
   handlers: Record<string, HandlerConfig>
   loggers: Record<string, LoggerConfig>
 }
@@ -134,7 +136,7 @@ function resolveLevel(name: string, configLevel: string): string {
   return configLevel.toLowerCase()
 }
 
-function createFileStream(filepath: string): Writable {
+function createFileStream(filepath: string, format?: string): Writable {
   const dest = pino.destination({ dest: filepath, mkdir: true, sync: true })
 
   let leftover = ''
@@ -149,7 +151,7 @@ function createFileStream(filepath: string): Writable {
         if (!line.trim()) continue
         try {
           const obj = JSON.parse(line)
-          const formatted = formatLogLine(obj)
+          const formatted = formatLogLine(obj, format)
           const plain = formatted.replace(/\x1b\[[0-9;]*m/g, '')
           this.push(plain + '\n')
         } catch {
@@ -164,7 +166,7 @@ function createFileStream(filepath: string): Writable {
       if (leftover) {
         try {
           const obj = JSON.parse(leftover)
-          const formatted = formatLogLine(obj)
+          const formatted = formatLogLine(obj, format)
           const plain = formatted.replace(/\x1b\[[0-9;]*m/g, '')
           this.push(plain + '\n')
         } catch {
@@ -196,13 +198,15 @@ function buildLoggerFromConfig(
       throw new Error(`Handler "${handlerName}" not found in config`)
     }
 
+    const resolvedFormat = handler.format ?? loggingConfig.format ?? DEFAULT_FORMAT
+
     if (handler.type === 'console') {
-      return { level: handler.level.toLowerCase(), stream: createConsoleStream() }
+      return { level: handler.level.toLowerCase(), stream: createConsoleStream(resolvedFormat) }
     }
 
     if (handler.type === 'file') {
       const dest = resolve(process.cwd(), handler.filename!)
-      return { level: handler.level.toLowerCase(), stream: createFileStream(dest) }
+      return { level: handler.level.toLowerCase(), stream: createFileStream(dest, resolvedFormat) }
     }
 
     throw new Error(`Unknown handler type: ${handler.type}`)

@@ -16,6 +16,10 @@ export async function ensureDatabaseReady(): Promise<void> {
   fs.mkdirSync(DATA_DIR, { recursive: true })
   log.info('Data directory ready', { dataDir: DATA_DIR })
 
+  await db.run(sql`PRAGMA journal_mode = WAL`)
+  await db.run(sql`PRAGMA busy_timeout = 5000`)
+  log.info('SQLite PRAGMA set: WAL mode, busy_timeout=5000')
+
   const existingResult = await db.all<{ name: string }>(
     sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_cf%' ORDER BY name`
   )
