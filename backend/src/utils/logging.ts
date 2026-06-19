@@ -3,7 +3,8 @@ import type { Logger } from 'pino'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { createConsoleStream } from './consoleTransport'
+import { Transform, Writable } from 'stream'
+import { createConsoleStream, formatLogLine } from './consoleTransport'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -133,6 +134,51 @@ function resolveLevel(name: string, configLevel: string): string {
   return configLevel.toLowerCase()
 }
 
+function createFileStream(filepath: string): Writable {
+  const dest = pino.destination({ dest: filepath, mkdir: true, sync: true })
+
+  let leftover = ''
+
+  const transform = new Transform({
+    transform(chunk: Buffer, _encoding: string, callback: () => void) {
+      const text = leftover + chunk.toString('utf-8')
+      const lines = text.split('\n')
+      leftover = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const obj = JSON.parse(line)
+          const formatted = formatLogLine(obj)
+          const plain = formatted.replace(/\x1b\[[0-9;]*m/g, '')
+          this.push(plain + '\n')
+        } catch {
+          this.push(line + '\n')
+        }
+      }
+
+      callback()
+    },
+
+    final(callback: () => void) {
+      if (leftover) {
+        try {
+          const obj = JSON.parse(leftover)
+          const formatted = formatLogLine(obj)
+          const plain = formatted.replace(/\x1b\[[0-9;]*m/g, '')
+          this.push(plain + '\n')
+        } catch {
+          this.push(leftover + '\n')
+        }
+      }
+      callback()
+    },
+  })
+
+  transform.pipe(dest as unknown as Writable)
+  return transform
+}
+
 function buildLoggerFromConfig(
   loggingConfig: LoggingConfig,
   name: string,
@@ -151,12 +197,12 @@ function buildLoggerFromConfig(
     }
 
     if (handler.type === 'console') {
-      return { level: 'trace', stream: createConsoleStream() }
+      return { level: handler.level.toLowerCase(), stream: createConsoleStream() }
     }
 
     if (handler.type === 'file') {
       const dest = resolve(process.cwd(), handler.filename!)
-      return { level: 'trace', stream: pino.destination({ dest, mkdir: true }) }
+      return { level: handler.level.toLowerCase(), stream: createFileStream(dest) }
     }
 
     throw new Error(`Unknown handler type: ${handler.type}`)

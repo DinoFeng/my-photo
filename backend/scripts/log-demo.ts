@@ -23,10 +23,11 @@ const config: LoggingConfig = {
   handlers: {
     console: { type: 'console', level: 'DEBUG' },
     myFile: { type: 'file', filename: './logs/demo.log', level: 'DEBUG' },
+    errorFile: { type: 'file', filename: './logs/error.log', level: 'error' },
   },
   loggers: {
     demo: { level: 'TRACE', handlers: ['console'] },
-    demoFile: { level: 'DEBUG', handlers: ['console', 'myFile'] },
+    demoFile: { level: 'DEBUG', handlers: ['console', 'myFile', 'errorFile'] },
   },
 }
 
@@ -68,7 +69,7 @@ console.log('══════════════════════�
 console.log('')
 
 const err = new Error('Task processing time exceeded')
-demo.exception('扫描目录失败', err, { dirPath: 'media/xiuren/85/8553' })
+demoFile.exception('扫描目录失败', err, { dirPath: 'media/xiuren/85/8553' })
 
 console.log('')
 

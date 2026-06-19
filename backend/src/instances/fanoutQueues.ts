@@ -2,9 +2,38 @@ import { EventFanoutManager } from '../utils/eventFanoutManager';
 import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
 import type { ScanPayload } from '../types/fanout';
 import type { UpsertResult } from '../types/media';
+import type { LoggerLike } from 'queue-manager-pro';
+import { appLogger } from '../utils/logging';
 import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
+
+function createQueueLogger(name: string): LoggerLike {
+  return {
+    info(...args: any[]) {
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      appLogger.info(msg, { queue: name });
+    },
+    warn(...args: any[]) {
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      appLogger.warn(msg, { queue: name });
+    },
+    error(...args: any[]) {
+      const errArg = args.find((a) => a instanceof Error);
+      const msg = args.map((a) => (a instanceof Error ? a.message : typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      const context: Record<string, any> = { queue: name };
+      if (errArg) {
+        context.originalCode = (errArg as any).code;
+        context.originalName = errArg.name;
+      }
+      appLogger.exception(msg, undefined, context);
+    },
+    debug(...args: any[]) {
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      appLogger.debug(msg, { queue: name });
+    },
+  };
+}
 
 export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) => Promise<void> }>('scan', [
   {
@@ -24,7 +53,7 @@ export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload
       maxRetries: 3,
       maxProcessingTime: 60000,
       concurrency: 10,
-      logger: console
+      logger: createQueueLogger('scan-folder')
     }
   }
 ]);
@@ -47,7 +76,7 @@ export const fileFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       maxRetries: 3,
       maxProcessingTime: 120000,
       concurrency: 20,
-      logger: console
+      logger: createQueueLogger('read-file')
     }
   }
 ]);

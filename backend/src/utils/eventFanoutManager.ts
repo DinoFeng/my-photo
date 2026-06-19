@@ -21,12 +21,18 @@ export class EventFanoutManager<H extends HandlerMap = HandlerMap> {
         options?: { maxRetries?: number; maxProcessingTime?: number }
     ): void {
         const queue = this.getQueue(queueName);
-        queue.register(this.taskName as keyof H, handler as H[keyof H], options);
+        queue.register(this.taskName as keyof H, handler as H[keyof H], {
+            ...options,
+            paramSchema: () => ({ isValid: true as const, message: null }),
+        });
     }
 
     registerAll(handler: H[keyof H], options?: { maxRetries?: number; maxProcessingTime?: number }): void {
         for (const queue of this.queues.values()) {
-            queue.register(this.taskName as keyof H, handler as H[keyof H], options);
+            queue.register(this.taskName as keyof H, handler as H[keyof H], {
+                ...options,
+                paramSchema: () => ({ isValid: true as const, message: null }),
+            });
         }
     }
 

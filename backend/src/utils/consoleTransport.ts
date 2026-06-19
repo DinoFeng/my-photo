@@ -32,7 +32,7 @@ function formatTime(epoch: number): string {
 
 const PINO_BUILTIN_KEYS = new Set(['level', 'time', 'pid', 'hostname', 'name', 'msg', 'v', 'caller', 'err'])
 
-function formatLogLine(obj: any): string {
+export function formatLogLine(obj: any): string {
   const time = formatTime(obj.time)
   const name = obj.name || 'app'
   const pid = obj.pid
