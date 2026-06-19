@@ -93,7 +93,7 @@ export const useMediaStore = defineStore('media', () => {
     
     try {
       await sseRequest(
-        '/sse/media-updates',
+        '/media-updates',
         {
           'media-added': (mediaItem: Media) => {
             addMedia(mediaItem)

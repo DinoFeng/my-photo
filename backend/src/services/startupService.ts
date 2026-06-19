@@ -5,6 +5,9 @@ import { scanCheckpoint } from '../db/schema'
 import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
+import { appLogger } from '../utils/logging'
+
+const log = appLogger
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 
@@ -12,10 +15,10 @@ async function getMediaSubDirectories(): Promise<string[]> {
   try {
     const entries = await fs.promises.readdir(MEDIA_PATH, { withFileTypes: true })
     return entries
-      .filter(entry => entry.isDirectory())
+      .filter(entry => entry.isDirectory() || entry.isSymbolicLink())
       .map(entry => path.join(MEDIA_PATH, entry.name))
   } catch {
-    console.log('[Startup] media 目录不存在或无法读取')
+    log.warn('media 目录不存在或无法读取')
     return []
   }
 }
@@ -38,41 +41,38 @@ async function scanKnownDirectories(): Promise<void> {
     total += checkpoints.length
 
     await Promise.all(checkpoints.map(cp =>
-      scanDirectory(cp.path, publishScanEntry).catch((error: any) => {
-        console.error(`[Startup] 扫描已知目录失败 ${cp.path}:`, error.message)
+      scanDirectory(cp.path, publishScanEntry).catch((error: unknown) => {
+        log.exception('扫描已知目录失败', error instanceof Error ? error : undefined, { path: cp.path })
       })
     ))
 
     offset += PAGE_SIZE
   }
 
-  console.log(`[Startup] 已检查 ${total} 个已知目录`)
+  log.info('已检查已知目录', { total })
 }
 
 export async function checkAndPublishChangedDirectories(): Promise<void> {
-  console.log('[Startup] 检查 media 目录变化...')
+  log.info('检查 media 目录变化...')
 
-  // 第一步：遍历 checkpoint 表，检查已知目录是否变化
   await scanKnownDirectories()
 
-  // 第二步：readdir 兜底，处理 checkpoint 表中不存在的新目录
-  // 已在第一步处理过的目录，hasDirectoryChanged 会返回 false，不会重复扫描
   const subDirs = await getMediaSubDirectories()
   if (subDirs.length === 0) {
-    console.log('[Startup] 未找到挂载的子目录')
+    log.warn('未找到挂载的子目录')
     return
   }
-  console.log(`[Startup] 当前 media 下有 ${subDirs.length} 个子目录`)
+  log.info('当前 media 子目录数量', { count: subDirs.length })
 
-  console.log('[Startup] 启动目录监听...')
+  log.info('启动目录监听...')
   for (const dirPath of subDirs) {
     createFileWatcher(dirPath)
   }
 
-  console.log('[Startup] 补充扫描新目录...')
+  log.info('补充扫描新目录...')
   for (const dirPath of subDirs) {
     await scanDirectory(dirPath, publishScanEntry)
   }
 
-  console.log('[Startup] media 目录检查完成')
+  log.info('media 目录检查完成')
 }

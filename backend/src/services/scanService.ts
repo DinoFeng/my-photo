@@ -5,7 +5,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { db as drizzleDb } from '../db/index'
 import { scanCheckpoint, media } from '../db/schema'
 import type { ScanPayload, PublishFn } from '../types/fanout'
-// import { eventBus } from '../instances/eventBus'
+import { appLogger } from '../utils/logging'
+
+const log = appLogger
 
 const MEDIA_PATH = process.env.MEDIA_PATH || './media'
 const PUBLISH_BATCH = 50
@@ -94,9 +96,7 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
       })
       .where(eq(scanCheckpoint.path, dirPath))
 
-    console.log(
-      `[ScanService] Published ${payloads.length} entries from: ${dirPath}`
-    )
+    log.info('Published entries from directory', { count: payloads.length, dirPath })
 
     // eventBus.emit('scanProgressUpdated', {
     //   sourceDirectoryId: dirPath,
@@ -112,7 +112,7 @@ async function processDirectory(dirPath: string, publish: PublishFn): Promise<vo
       })
       .where(eq(scanCheckpoint.path, dirPath))
 
-    console.error(`[ScanService] Failed to process directory ${dirPath}:`, error.message)
+    log.exception('Failed to process directory', error instanceof Error ? error : undefined, { dirPath })
   }
 }
 
@@ -124,17 +124,17 @@ export async function scanDirectory(dirPath: string, publish: PublishFn): Promis
   const { changed, exists } = await hasDirectoryChanged(dirPath)
 
   if (!exists) {
-    console.log(`[ScanService] Directory removed, cleaning up: ${dirPath}`)
+    log.info('Directory removed, cleaning up', { dirPath })
     await deleteDirectoryRecords(dirPath)
     return false
   }
 
   if (!changed) {
-    console.log(`[ScanService] Directory not changed, skipping: ${dirPath}`)
+    log.debug('Directory not changed, skipping', { dirPath })
     return false
   }
 
-  console.log(`[ScanService] Scanning directory: ${dirPath}`)
+  log.info('Scanning directory', { dirPath })
   await processDirectory(dirPath, publish)
   return true
 }
@@ -148,7 +148,7 @@ export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
   await drizzleDb.delete(media).where(like(media.filepath, likePath))
   await drizzleDb.delete(scanCheckpoint).where(like(scanCheckpoint.path, likePath))
 
-  console.log(`[ScanService] Cleaned up records for deleted directory: ${dirPath}`)
+  log.info('Cleaned up records for deleted directory', { dirPath })
 }
 
 export async function processScanFolder(payload: ScanPayload, publish: PublishFn): Promise<void> {

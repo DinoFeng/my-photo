@@ -59,7 +59,7 @@ export async function sseRequest(
   handlers: SSEEventHandlers,
   abortSignal: AbortSignal
 ): Promise<void> {
-  const response = await fetch(`/api${endpoint}`, {
+  const response = await fetch(`/sse${endpoint}`, {
     headers: {
       'Authorization': AUTH_HEADER,
       'Accept': 'text/event-stream'

@@ -23,7 +23,7 @@ export const folderFanout = new EventFanoutManager<{ scan: (payload: ScanPayload
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 60000,
-      concurrency: 1,
+      concurrency: 10,
       logger: console
     }
   }
@@ -46,7 +46,7 @@ export const fileFanout = new EventFanoutManager<{ scan: (payload: ScanPayload) 
       delay: 1000,
       maxRetries: 3,
       maxProcessingTime: 120000,
-      concurrency: 2,
+      concurrency: 20,
       logger: console
     }
   }

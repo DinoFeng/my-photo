@@ -2,16 +2,19 @@ import fs from 'fs'
 import path from 'path'
 import { sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
+import { appLogger } from '../utils/logging'
+
+const log = appLogger
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 
 const ALL_TABLES = ['media', 'scan_checkpoint', 'setting'] as const
 
 export async function ensureDatabaseReady(): Promise<void> {
-  console.log('[DB Init] Starting database initialization...')
+  log.info('Starting database initialization...')
 
   fs.mkdirSync(DATA_DIR, { recursive: true })
-  console.log(`[DB Init] Data directory ready: ${DATA_DIR}`)
+  log.info('Data directory ready', { dataDir: DATA_DIR })
 
   const existingResult = await db.all<{ name: string }>(
     sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_cf%' ORDER BY name`
@@ -20,9 +23,9 @@ export async function ensureDatabaseReady(): Promise<void> {
 
   for (const tableName of ALL_TABLES) {
     if (existingTables.has(tableName)) {
-      console.log(`[DB Init]   ✓ ${tableName} (已存在)`)
+      log.debug('Table already exists', { tableName })
     } else {
-      console.log(`[DB Init]   ✨ ${tableName} (新建)`)
+      log.info('Table will be created', { tableName })
     }
   }
 
@@ -81,5 +84,5 @@ export async function ensureDatabaseReady(): Promise<void> {
     )
   `)
 
-  console.log('[DB Init] Database initialization complete')
+  log.info('Database initialization complete')
 }

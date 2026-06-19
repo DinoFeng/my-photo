@@ -1,5 +1,8 @@
 import { Request, Response } from 'express'
+import { appLogger } from '../utils/logging'
 // import { exportFanout } from '../instances/fanoutQueues'
+
+const log = appLogger
 
 export async function batchExport(req: Request, res: Response) {
   try {
@@ -8,6 +11,7 @@ export async function batchExport(req: Request, res: Response) {
     // await exportFanout.publish({ mediaIds, exportPath, organizePattern })
     res.json({ message: 'Export started (queue disabled)' })
   } catch (error) {
+    log.exception('Failed to start export', error instanceof Error ? error : undefined)
     res.status(500).json({ error: 'Failed to start export' })
   }
 }
@@ -16,6 +20,7 @@ export async function getExportStatus(req: Request, res: Response) {
   try {
     res.json({ status: 'ready' })
   } catch (error) {
+    log.exception('Failed to get export status', error instanceof Error ? error : undefined)
     res.status(500).json({ error: 'Failed to get export status' })
   }
 }

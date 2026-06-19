@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { folderFanout, fileFanout } from '../instances/fanoutQueues';
+import { folderFanout, fileFanout } from '../../instances/fanoutQueues';
+import { appLogger } from '../../utils/logging';
+
+const log = appLogger
 
 const router: Router = Router();
 
@@ -29,6 +32,7 @@ router.get('/status', async (_req: Request, res: Response) => {
     ]);
     res.json([folderStatus, fileStatus]);
   } catch (error) {
+    log.exception('Failed to get queue status', error instanceof Error ? error : undefined)
     res.status(500).json({ error: String(error) });
   }
 });
@@ -43,6 +47,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
     ]);
     res.json({ folder: folderTasks, file: fileTasks });
   } catch (error) {
+    log.exception('Failed to get queue tasks', error instanceof Error ? error : undefined)
     res.status(500).json({ error: String(error) });
   }
 });

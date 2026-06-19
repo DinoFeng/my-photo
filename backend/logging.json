@@ -1,0 +1,24 @@
+{
+  "handlers": {
+    "console": {
+      "type": "console",
+      "level": "DEBUG"
+    },
+    "file": {
+      "type": "file",
+      "filename": "./logs/app.log",
+      "level": "INFO"
+    },
+    "errorFile": {
+      "type": "file",
+      "filename": "./logs/error.log",
+      "level": "ERROR"
+    }
+  },
+  "loggers": {
+    "app": {
+      "level": "DEBUG",
+      "handlers": ["console", "file", "errorFile"]
+    }
+  }
+}

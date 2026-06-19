@@ -1,31 +1,34 @@
 import chokidar from 'chokidar'
+import { appLogger } from '../utils/logging'
+
+const log = appLogger
 
 function handleAdd(filePath: string): void {
-  console.log(`[Watcher] File added: ${filePath}`)
+  log.info('File added', { filePath })
 }
 
 function handleAddDir(dirPath: string): void {
-  console.log(`[Watcher] Directory added: ${dirPath}`)
+  log.info('Directory added', { dirPath })
 }
 
 function handleChange(filePath: string): void {
-  console.log(`[Watcher] File changed: ${filePath}`)
+  log.info('File changed', { filePath })
 }
 
 function handleUnlink(filePath: string): void {
-  console.log(`[Watcher] File removed: ${filePath}`)
+  log.info('File removed', { filePath })
 }
 
 function handleUnlinkDir(dirPath: string): void {
-  console.log(`[Watcher] Directory removed: ${dirPath}`)
+  log.info('Directory removed', { dirPath })
 }
 
 function handleError(dirPath: string, error: Error): void {
-  console.error(`[Watcher] Watcher error: ${dirPath}, Error: ${error}`)
+  log.exception('Watcher error', error, { dirPath })
 }
 
 function handleReady(dirPath: string): void {
-  console.log(`[Watcher] Ready watching: ${dirPath}`)
+  log.info('Watcher ready', { dirPath })
 }
 
 export function createFileWatcher(dirPath: string): chokidar.FSWatcher | null {
@@ -46,7 +49,7 @@ export function createFileWatcher(dirPath: string): chokidar.FSWatcher | null {
 
     return watcher
   } catch (error: any) {
-    console.error(`[Watcher] Failed to create watcher for ${dirPath}:`, error.message)
+    log.exception('Failed to create watcher', error instanceof Error ? error : undefined, { dirPath })
     return null
   }
 }

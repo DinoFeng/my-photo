@@ -7,7 +7,9 @@ import type { UpsertResult } from '../types/media'
 import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '../utils/fileUtils'
 import { db } from '../db/index'
 import { media } from '../db/schema'
-// import { eventBus } from '../instances/eventBus'
+import { appLogger } from '../utils/logging'
+
+const log = appLogger
 
 interface MediaData {
   filename: string
@@ -131,12 +133,12 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
   if (payload.type !== 'file') return
 
   if (!isMediaFile(payload.currentPath)) {
-    console.error(`[MediaService] Not a media file, skipping: ${payload.currentPath}`)
+    log.warn('Not a media file, skipping', { currentPath: payload.currentPath })
     return
   }
 
   if (!payload.sourcePath) {
-    console.log(`[MediaService] No source directory found for: ${payload.currentPath}`)
+    log.warn('No source directory found', { currentPath: payload.currentPath })
     return
   }
 
@@ -152,7 +154,7 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
   const hash = await calculateFileHash(payload.currentPath)
 
   if (existing[0]?.hash === hash) {
-    console.log(`[MediaService] File unchanged, skipping: ${payload.currentPath}`)
+    log.debug('File unchanged, skipping', { currentPath: payload.currentPath })
     return
   }
 
@@ -164,9 +166,7 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
   const mediaData = buildMediaData(stat, hash, metadata, fileType, filename, now)
   const result = await upsertMedia(payload.currentPath, payload.sourcePath, mediaData, existing[0]?.id)
 
-  console.log(
-    `[MediaService] Media file ${result.action === 'insert' ? 'imported' : 'updated'}: ${payload.currentPath}`,
-  )
+  log.info('Media file processed', { action: result.action, currentPath: payload.currentPath })
 
   await publish(result)
 
