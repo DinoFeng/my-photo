@@ -31,25 +31,28 @@ function handleReady(dirPath: string): void {
   log.info('Watcher ready', { dirPath })
 }
 
-export function createFileWatcher(dirPath: string): chokidar.FSWatcher | null {
-  try {
-    const watcher = chokidar.watch(dirPath, {
-      persistent: true,
-      ignoreInitial: true,
-      ignorePermissionErrors: true
-    })
+export function createFileWatcher(dirPath: string): Promise<chokidar.FSWatcher | null> {
+  return new Promise((resolve) => {
+    try {
+      const watcher = chokidar.watch(dirPath, {
+        persistent: true,
+        ignoreInitial: true,
+        ignorePermissionErrors: true
+      })
 
-    watcher.on('add', handleAdd)
-    watcher.on('addDir', handleAddDir)
-    watcher.on('change', handleChange)
-    watcher.on('unlink', handleUnlink)
-    watcher.on('unlinkDir', handleUnlinkDir)
-    watcher.on('error', (error) => handleError(dirPath, error))
-    watcher.on('ready', () => handleReady(dirPath))
-
-    return watcher
-  } catch (error: any) {
-    log.exception('Failed to create watcher', error instanceof Error ? error : undefined, { dirPath })
-    return null
-  }
+      watcher.on('add', handleAdd)
+      watcher.on('addDir', handleAddDir)
+      watcher.on('change', handleChange)
+      watcher.on('unlink', handleUnlink)
+      watcher.on('unlinkDir', handleUnlinkDir)
+      watcher.on('error', (error) => handleError(dirPath, error))
+      watcher.on('ready', () => {
+        handleReady(dirPath)
+        resolve(watcher)
+      })
+    } catch (error: any) {
+      log.exception('Failed to create watcher', error instanceof Error ? error : undefined, { dirPath })
+      resolve(null)
+    }
+  })
 }

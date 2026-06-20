@@ -7,7 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddlewa
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
 import { appLogger } from './utils/logging'
 import { ensureDatabaseReady } from './services/dbInitService'
-import { checkAndPublishChangedDirectories } from './services/startupService'
+import { startDirectoryWatchers, scanDirectories } from './services/startupService'
 import { startAllQueues } from './instances/fanoutQueues'
 import './listeners/queueHandlers'
 import { registerEventHandlers } from './listeners/eventHandlers'
@@ -43,8 +43,9 @@ app.listen(PORT, async () => {
     appLogger.info('Database ready, API available')
 
     registerEventHandlers()
+    await startDirectoryWatchers()
     startAllQueues()
-    await checkAndPublishChangedDirectories()
+    await scanDirectories()
     appLogger.info('Startup complete')
   } catch (error) {
     appLogger.exception('Startup failed', error instanceof Error ? error : undefined)

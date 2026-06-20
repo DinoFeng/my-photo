@@ -52,10 +52,8 @@ async function scanKnownDirectories(): Promise<void> {
   log.info('已检查已知目录', { total })
 }
 
-export async function checkAndPublishChangedDirectories(): Promise<void> {
-  log.info('检查 media 目录变化...')
-
-  await scanKnownDirectories()
+export async function startDirectoryWatchers(): Promise<void> {
+  log.info('启动目录监听...')
 
   const subDirs = await getMediaSubDirectories()
   if (subDirs.length === 0) {
@@ -64,10 +62,21 @@ export async function checkAndPublishChangedDirectories(): Promise<void> {
   }
   log.info('当前 media 子目录数量', { count: subDirs.length })
 
-  log.info('启动目录监听...')
-  for (const dirPath of subDirs) {
-    createFileWatcher(dirPath)
+  await Promise.all(subDirs.map(dirPath => createFileWatcher(dirPath)))
+  log.info('所有目录监听已就绪')
+}
+
+export async function scanDirectories(): Promise<void> {
+  log.info('检查 media 目录变化...')
+
+  const subDirs = await getMediaSubDirectories()
+  if (subDirs.length === 0) {
+    log.warn('未找到挂载的子目录')
+    return
   }
+
+  log.info('检查已知目录变化...')
+  await scanKnownDirectories()
 
   log.info('补充扫描新目录...')
   for (const dirPath of subDirs) {
