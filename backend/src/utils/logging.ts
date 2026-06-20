@@ -18,6 +18,12 @@ const LOG_METHODS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as cons
 function wrapLogger(logger: Logger): Logger {
   return new Proxy(logger, {
     get(target, prop) {
+      if (prop === 'child') {
+        return function (bindings: Record<string, unknown>) {
+          return wrapLogger(target.child(bindings))
+        }
+      }
+
       if (prop === 'exception') {
         const fn = function exception(message: string, error?: Error, ...args: any[]) {
           const errorLog = (target as any).error.bind(target)

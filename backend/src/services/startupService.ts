@@ -17,8 +17,8 @@ async function getMediaSubDirectories(): Promise<string[]> {
     return entries
       .filter(entry => entry.isDirectory() || entry.isSymbolicLink())
       .map(entry => path.join(MEDIA_PATH, entry.name))
-  } catch {
-    log.warn('media 目录不存在或无法读取')
+  } catch (err) {
+    log.exception('media 目录不存在或无法读取', err instanceof Error ? err : undefined)
     return []
   }
 }

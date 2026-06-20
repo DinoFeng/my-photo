@@ -2,16 +2,34 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import ExifReader from 'exifreader'
+import { appLogger } from './logging'
+
+const HASH_SAMPLE_SIZE = 64 * 1024
+const EXIF_READ_SIZE = 128 * 1024
 
 export async function calculateFileHash(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256')
-    const stream = fs.createReadStream(filePath)
+  const { size } = await fs.promises.stat(filePath)
 
-    stream.on('data', (data) => hash.update(data))
-    stream.on('end', () => resolve(hash.digest('hex')))
-    stream.on('error', (err) => reject(err))
-  })
+  const hash = crypto.createHash('sha256')
+  hash.update(String(size))
+
+  const fd = await fs.promises.open(filePath, 'r')
+  try {
+    const head = Buffer.alloc(HASH_SAMPLE_SIZE)
+    const headResult = await fd.read(head, 0, HASH_SAMPLE_SIZE, 0)
+    hash.update(head.subarray(0, headResult.bytesRead))
+
+    if (size > HASH_SAMPLE_SIZE) {
+      const tail = Buffer.alloc(HASH_SAMPLE_SIZE)
+      const tailOffset = Math.max(HASH_SAMPLE_SIZE, size - HASH_SAMPLE_SIZE)
+      const tailResult = await fd.read(tail, 0, HASH_SAMPLE_SIZE, tailOffset)
+      hash.update(tail.subarray(0, tailResult.bytesRead))
+    }
+  } finally {
+    await fd.close()
+  }
+
+  return hash.digest('hex')
 }
 
 function parseExifDate(dateStr: string): Date | null {
@@ -34,7 +52,7 @@ export async function getFileMetadata(filePath: string): Promise<{
   metadata?: Record<string, unknown>
 }> {
   try {
-    const tags = await ExifReader.load(filePath)
+    const tags = await ExifReader.load(filePath, { length: EXIF_READ_SIZE })
     
     const result: {
       width?: number
@@ -79,7 +97,8 @@ export async function getFileMetadata(filePath: string): Promise<{
     )
 
     return result
-  } catch {
+  } catch (err) {
+    appLogger.exception('Failed to read EXIF', err instanceof Error ? err : undefined, { filePath })
     return {}
   }
 }

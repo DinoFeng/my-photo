@@ -49,6 +49,7 @@ export class SqliteQueueRepository implements QueueRepository {
         updatedAt TEXT NOT NULL
       )
     `);
+    await this.client.execute(`CREATE INDEX IF NOT EXISTS idx_${this.tableName}_status ON ${this.tableName}(status)`);
     await this.client.execute(`PRAGMA journal_mode = WAL`);
     await this.client.execute(`PRAGMA busy_timeout = 5000`);
   }
@@ -64,14 +65,12 @@ export class SqliteQueueRepository implements QueueRepository {
       : `SELECT * FROM ${this.tableName}`;
     const args = status ? [status] : [];
     const result = await this.client.execute({ sql, args });
-
     return result.rows.map(row => this.rowToTask(row));
   }
 
   async saveTasks(tasks: Task<HandlerMap>[], _status?: Task<HandlerMap>['status']): Promise<Task<HandlerMap>[]> {
     await this.ensureInitialized();
     await this.client.execute(`DELETE FROM ${this.tableName}`);
-
     for (const task of tasks) {
       await this.enqueue(task);
     }
@@ -80,6 +79,7 @@ export class SqliteQueueRepository implements QueueRepository {
 
   async enqueue(task: Task<HandlerMap>): Promise<void> {
     await this.ensureInitialized();
+    const t0 = Date.now();
     const sql = `
       INSERT INTO ${this.tableName} (id, handler, payload, status, log, retryCount, maxRetries, maxProcessingTime, priority, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -100,12 +100,14 @@ export class SqliteQueueRepository implements QueueRepository {
         typeof task.updatedAt === 'string' ? task.updatedAt : task.updatedAt.toISOString(),
       ]
     });
+    const elapsed = Date.now() - t0;
+    if (elapsed > 100) {
+      this.logger?.warn(`Slow enqueue: ${elapsed}ms`);
+    }
   }
 
   async updateTask(id: string, obj: Partial<Task<HandlerMap>>): Promise<Task<HandlerMap> | undefined> {
     await this.ensureInitialized();
-    const task = await this.getTaskById(id);
-    if (!task) return undefined;
 
     const updates: string[] = [];
     const args: (string | number | null)[] = [];
@@ -127,59 +129,49 @@ export class SqliteQueueRepository implements QueueRepository {
     args.push(new Date().toISOString());
     args.push(id);
 
-    const sql = `UPDATE ${this.tableName} SET ${updates.join(', ')} WHERE id = ?`;
-    await this.client.execute({ sql, args });
-
-    return this.getTaskById(id);
+    const sql = `UPDATE ${this.tableName} SET ${updates.join(', ')} WHERE id = ? RETURNING *`;
+    const result = await this.client.execute({ sql, args });
+    if (result.rows.length === 0) return undefined;
+    return this.rowToTask(result.rows[0]);
   }
 
   async deleteTask(id: string, hardDelete?: boolean): Promise<Task<HandlerMap> | undefined> {
     await this.ensureInitialized();
-    const task = await this.getTaskById(id);
-    if (!task) return undefined;
 
     if (hardDelete) {
-      await this.client.execute({
-        sql: `DELETE FROM ${this.tableName} WHERE id = ?`,
+      const result = await this.client.execute({
+        sql: `DELETE FROM ${this.tableName} WHERE id = ? RETURNING *`,
         args: [id]
       });
+      if (result.rows.length === 0) return undefined;
+      return this.rowToTask(result.rows[0]);
     } else {
-      await this.updateTask(id, { status: 'deleted' });
+      return this.updateTask(id, { status: 'deleted' });
     }
-    return task;
   }
 
   async dequeue(): Promise<Task<HandlerMap> | null> {
     await this.ensureInitialized();
     if (this.dequeueLock) return null;
     this.dequeueLock = true;
+    const t0 = Date.now();
 
     try {
-      const tasks = await this.loadTasks();
-      const taskToProcess = [...tasks]
-        .sort((a, b) => b.priority - a.priority || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .find(t => t.status === 'pending');
+      const sql = `SELECT * FROM ${this.tableName} WHERE status = ? ORDER BY priority DESC, createdAt ASC LIMIT 1`;
+      const result = await this.client.execute({ sql, args: ['pending'] });
+      if (result.rows.length === 0) return null;
 
-      if (taskToProcess) {
-        taskToProcess.status = 'processing';
-        await this.updateTask(taskToProcess.id, { status: 'processing' });
-        return taskToProcess;
-      } else {
-        await this.checkAndHandleStuckTasks(tasks);
-        return null;
+      const taskToProcess = this.rowToTask(result.rows[0]);
+      taskToProcess.status = 'processing';
+      await this.updateTask(taskToProcess.id, { status: 'processing' });
+      const elapsed = Date.now() - t0;
+      if (elapsed > 100) {
+        this.logger?.warn(`Slow dequeue: ${elapsed}ms`);
       }
+      return taskToProcess;
     } finally {
       this.dequeueLock = false;
     }
-  }
-
-  private async getTaskById(id: string): Promise<Task<HandlerMap> | undefined> {
-    const result = await this.client.execute({
-      sql: `SELECT * FROM ${this.tableName} WHERE id = ?`,
-      args: [id]
-    });
-    if (result.rows.length === 0) return undefined;
-    return this.rowToTask(result.rows[0]);
   }
 
   private rowToTask(row: Record<string, unknown>): Task<HandlerMap> {
@@ -196,33 +188,5 @@ export class SqliteQueueRepository implements QueueRepository {
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
     };
-  }
-
-  private async checkAndHandleStuckTasks(tasks: Task<HandlerMap>[]): Promise<void> {
-    const now = Date.now();
-    for (const task of tasks) {
-      if (task.status !== 'processing') continue;
-
-      const elapsed = now - new Date(task.updatedAt).getTime();
-      this.logger?.info(`Checking task ${task.id} status: elapsed time ${elapsed / 1000}s`);
-
-      const maxProcessingTime = task.maxProcessingTime ?? this.MAX_PROCESSING_TIME;
-      if (elapsed > maxProcessingTime) {
-        this.emitEvent?.('taskStuck', task);
-        this.logger?.warn(`Task ${task.id} is stuck`);
-
-        const maxRetries = task.maxRetries ?? this.MAX_RETRIES;
-        if (task.retryCount < maxRetries) {
-          this.logger?.warn(`Retrying task ${task.id} (${task.retryCount + 1}/${maxRetries})`);
-          await this.updateTask(task.id, { retryCount: task.retryCount + 1, status: 'pending' });
-          this.emitEvent?.('taskRetried', task);
-        } else {
-          const error = `Task ${task.id} failed after ${maxRetries} retries`;
-          this.emitEvent?.('taskFailed', task, new Error(error));
-          this.logger?.error(error);
-          await this.updateTask(task.id, { status: 'failed' });
-        }
-      }
-    }
   }
 }

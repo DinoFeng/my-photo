@@ -1,4 +1,5 @@
 {
+  "format": "{time} - {name} - {file}[line:{line}] - {level}: {msg}{extra}{err}",
   "handlers": {
     "console": {
       "type": "console",

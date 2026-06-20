@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { performance } from 'perf_hooks'
 import { v4 as uuidv4 } from 'uuid'
 import { eq } from 'drizzle-orm'
 import type { ScanPayload } from '../types/fanout'
@@ -8,9 +9,8 @@ import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '..
 import { db } from '../db/index'
 import { media } from '../db/schema'
 import { appLogger } from '../utils/logging'
+import type { LoggerWithException } from '../utils/logging'
 import { setStep, clearStep } from '../utils/stepTracker'
-
-const log = appLogger
 
 interface MediaData {
   filename: string
@@ -130,8 +130,14 @@ async function upsertMedia(
   }
 }
 
-export async function processReadFile(payload: ScanPayload, publish: (result: UpsertResult) => Promise<void>): Promise<void> {
+export async function processReadFile(
+  payload: ScanPayload,
+  publish: (result: UpsertResult) => Promise<void>,
+  opts?: { logger?: LoggerWithException },
+): Promise<void> {
   if (payload.type !== 'file') return
+
+  const log = opts?.logger ?? appLogger
 
   if (!isMediaFile(payload.currentPath)) {
     log.warn('Not a media file, skipping', { currentPath: payload.currentPath })
@@ -142,46 +148,55 @@ export async function processReadFile(payload: ScanPayload, publish: (result: Up
     log.warn('No source directory found', { currentPath: payload.currentPath })
     return
   }
-
   try {
-    setStep(payload.currentPath, 'stat+db')
-    const [existing, stat] = await Promise.all([
-      db
-        .select({ id: media.id, hash: media.hash })
-        .from(media)
-        .where(eq(media.filepath, payload.currentPath))
-        .limit(1),
-      fs.promises.stat(payload.currentPath),
-    ])
+    setStep(payload.currentPath, 'db')
+    const t_db0 = performance.now()
+    const existing = await db
+      .select({ id: media.id, hash: media.hash })
+      .from(media)
+      .where(eq(media.filepath, payload.currentPath))
+      .limit(1)
+    const t_db1 = performance.now()
+
+    setStep(payload.currentPath, 'stat')
+    const stat = await fs.promises.stat(payload.currentPath)
+    const t_stat1 = performance.now()
 
     setStep(payload.currentPath, 'hash')
     const hash = await calculateFileHash(payload.currentPath)
+    const t_hash1 = performance.now()
 
     if (existing[0]?.hash === hash) {
       log.debug('File unchanged, skipping', { currentPath: payload.currentPath })
       return
     }
 
-    setStep(payload.currentPath, 'metadata')
-    const metadata = await getFileMetadata(payload.currentPath)
+    setStep(payload.currentPath, 'exif')
     const fileType = getFileType(payload.currentPath)
     const filename = path.basename(payload.currentPath)
     const now = new Date().toISOString()
 
+    const metadata = await getFileMetadata(payload.currentPath)
+    const t_exif1 = performance.now()
+
     setStep(payload.currentPath, 'upsert')
     const mediaData = buildMediaData(stat, hash, metadata, fileType, filename, now)
     const result = await upsertMedia(payload.currentPath, payload.sourcePath, mediaData, existing[0]?.id)
+    const t_upsert1 = performance.now()
 
-    log.info('Media file processed', { action: result.action, currentPath: payload.currentPath })
+    log.info('Media file processed', {
+      action: result.action,
+      currentPath: payload.currentPath,
+      fileSize: stat.size,
+      db: `${(t_db1 - t_db0).toFixed(0)}ms`,
+      stat: `${(t_stat1 - t_db1).toFixed(0)}ms`,
+      hash: `${(t_hash1 - t_stat1).toFixed(0)}ms`,
+      exif: `${(t_exif1 - t_hash1).toFixed(0)}ms`,
+      upsert: `${(t_upsert1 - t_exif1).toFixed(0)}ms`,
+      total: `${(t_upsert1 - t_db0).toFixed(0)}ms`,
+    })
 
     await publish(result)
-
-    if (result.action === 'insert') {
-      // eventBus.emit('mediaAdded', {
-      //   sourceDirectoryId: payload.sourcePath,
-      //   mediaItem: { id: result.id, filename, filepath: payload.currentPath, fileType },
-      // })
-    }
   } finally {
     clearStep(payload.currentPath)
   }
