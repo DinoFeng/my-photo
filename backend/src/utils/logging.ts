@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { Transform, Writable } from 'stream'
+import { createStream as createRotatingStream } from 'rotating-file-stream'
 import { createConsoleStream, formatLogLine, DEFAULT_FORMAT } from './consoleTransport'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -105,11 +106,26 @@ function getCaller(): string {
   return ''
 }
 
+export interface RotationConfig {
+  size?: string
+  interval?: string
+  maxFiles?: number
+  compress?: boolean | 'gzip'
+}
+
+const DEFAULT_ROTATION: RotationConfig = {
+  size: '10M',
+  interval: '1d',
+  maxFiles: 30,
+  compress: 'gzip',
+}
+
 export interface HandlerConfig {
   type: 'console' | 'file'
   filename?: string
   level: string
   format?: string
+  rotation?: boolean | RotationConfig
 }
 
 export interface LoggerConfig {
@@ -142,9 +158,27 @@ function resolveLevel(name: string, configLevel: string): string {
   return configLevel.toLowerCase()
 }
 
-function createFileStream(filepath: string, format?: string): Writable {
-  const dest = pino.destination({ dest: filepath, mkdir: true, sync: true })
+function createFileStream(filepath: string, format?: string, rotation?: boolean | RotationConfig): Writable {
+  if (rotation === false) {
+    const dest = pino.destination({ dest: filepath, mkdir: true, sync: true }) as unknown as Writable
+    return createTransform(dest, format)
+  }
 
+  const merged: RotationConfig = typeof rotation === 'object'
+    ? { ...DEFAULT_ROTATION, ...rotation }
+    : { ...DEFAULT_ROTATION }
+
+  const dest = createRotatingStream(filepath, {
+    size: merged.size,
+    interval: merged.interval,
+    maxFiles: merged.maxFiles,
+    compress: merged.compress,
+  }) as unknown as Writable
+
+  return createTransform(dest, format)
+}
+
+function createTransform(dest: Writable, format?: string): Transform {
   let leftover = ''
 
   const transform = new Transform({
@@ -183,7 +217,7 @@ function createFileStream(filepath: string, format?: string): Writable {
     },
   })
 
-  transform.pipe(dest as unknown as Writable)
+  transform.pipe(dest)
   return transform
 }
 
@@ -212,7 +246,7 @@ function buildLoggerFromConfig(
 
     if (handler.type === 'file') {
       const dest = resolve(process.cwd(), handler.filename!)
-      return { level: handler.level.toLowerCase(), stream: createFileStream(dest, resolvedFormat) }
+      return { level: handler.level.toLowerCase(), stream: createFileStream(dest, resolvedFormat, handler.rotation) }
     }
 
     throw new Error(`Unknown handler type: ${handler.type}`)
