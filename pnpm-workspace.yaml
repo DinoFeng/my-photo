@@ -1,5 +1,4 @@
 packages:
-  - BackNestjs
   - backend
   - frontend
 allowBuilds:
