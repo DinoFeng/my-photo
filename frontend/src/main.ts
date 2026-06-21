@@ -35,7 +35,11 @@ const i18n = createI18n({
       duplicateStrategy: '重复文件处理',
       skipDuplicate: '跳过',
       overwriteDuplicate: '覆盖',
-      renameDuplicate: '重命名'
+      renameDuplicate: '重命名',
+      allTypes: '全部类型',
+      photo: '图片',
+      video: '视频',
+      allLoaded: '已加载全部'
     },
     'en': {
       appTitle: 'NAS Photo Manager',
@@ -61,7 +65,11 @@ const i18n = createI18n({
       duplicateStrategy: 'Duplicate Handling',
       skipDuplicate: 'Skip',
       overwriteDuplicate: 'Overwrite',
-      renameDuplicate: 'Rename'
+      renameDuplicate: 'Rename',
+      allTypes: 'All Types',
+      photo: 'Photo',
+      video: 'Video',
+      allLoaded: 'All Loaded'
     }
   }
 })

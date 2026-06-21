@@ -11,7 +11,6 @@ export const useMonitorStore = defineStore('monitor', () => {
   const events = ref<MonitorEvent[]>([])
   const isConnected = ref(false)
   let eventSource: EventSource | null = null
-  let eventBuffer: MonitorEvent[] = []
 
   const addEvent = (event: string, data: any) => {
     const monitorEvent: MonitorEvent = {
@@ -30,7 +29,7 @@ export const useMonitorStore = defineStore('monitor', () => {
   const connect = () => {
     if (eventSource) return
 
-    eventSource = new EventSource('/api/sse/connect')
+    eventSource = new EventSource('/sse/connect')
 
     eventSource.addEventListener('connected', (e) => {
       console.log('[Monitor] SSE connected:', JSON.parse(e.data))

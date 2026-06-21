@@ -47,5 +47,7 @@ function createQueueHandler(
   }
 }
 
-folderFanout.register('scan-folder', createQueueHandler('scan-folder', 2, (payload, opts) => processScanFolder(payload, publishScanEntry, opts)))
-fileFanout.register('read-file', createQueueHandler('read-file', 3, (payload, opts) => processReadFile(payload, publishImportEntry, opts)))
+export function registerQueueHandlers(): void {
+  folderFanout.register('scan-folder', createQueueHandler('scan-folder', 2, (payload, opts) => processScanFolder(payload, publishScanEntry, opts)))
+  fileFanout.register('read-file', createQueueHandler('read-file', 3, (payload, opts) => processReadFile(payload, publishImportEntry, opts)))
+}

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { monitorService } from '../../instances/sse';
+import { monitorService, mediaUpdateService } from '../../instances/sse';
 import { appLogger } from '../../utils/logging';
 
 const router: Router = Router();
@@ -13,6 +13,17 @@ router.get('/connect', (req, res) => {
   });
 
   appLogger.info('SSE client connected', { clientId });
+});
+
+router.get('/media-updates', (req, res) => {
+  const { clientId } = mediaUpdateService.setupConnection(res, {});
+
+  mediaUpdateService.sendEvent(clientId, {
+    event: 'connected',
+    data: { clientId, timestamp: new Date().toISOString() }
+  });
+
+  appLogger.info('SSE media-updates client connected', { clientId });
 });
 
 export default router;

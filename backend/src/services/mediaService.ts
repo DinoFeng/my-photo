@@ -135,6 +135,7 @@ export async function processReadFile(
   publish: (result: UpsertResult) => Promise<void>,
   opts?: { logger?: LoggerWithException },
 ): Promise<void> {
+
   if (payload.type !== 'file') return
 
   const log = opts?.logger ?? appLogger
@@ -149,6 +150,7 @@ export async function processReadFile(
     return
   }
   try {
+    throw new Error('Exif metadata not implemented')
     setStep(payload.currentPath, 'db')
     const t_db0 = performance.now()
     const existing = await db

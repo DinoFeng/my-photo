@@ -1,11 +1,14 @@
 packages:
+  - BackNestjs
   - backend
   - frontend
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
+  '@swc/core': true
   esbuild: true
   exifreader: true
   prisma: true
   sharp: true
+  tsup: true
   vue-demi: true

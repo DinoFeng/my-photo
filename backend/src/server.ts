@@ -7,11 +7,10 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddlewa
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
 import { appLogger } from './utils/logging'
 import { ensureDatabaseReady } from './services/dbInitService'
-import { startDirectoryWatchers, scanDirectories } from './services/startupService'
-import { startAllQueues } from './instances/fanoutQueues'
-import './listeners/queueHandlers'
 import { registerEventHandlers } from './listeners/eventHandlers'
 import { monitorService } from './instances/sse'
+import { eventBus } from './instances/eventBus'
+import { DB_READY } from './utils/eventBus'
 
 dotenv.config()
 
@@ -31,6 +30,8 @@ app.use(notFoundHandler)
 app.use(errorLogger)
 app.use(errorHandler)
 
+registerEventHandlers()
+
 app.listen(PORT, async () => {
   appLogger.info(`Server running on port ${PORT}`)
   try {
@@ -40,13 +41,9 @@ app.listen(PORT, async () => {
       event: 'ready',
       data: { status: 'ready', timestamp: new Date().toISOString() },
     })
-    appLogger.info('Database ready, API available')
+    appLogger.info('API ready')
 
-    registerEventHandlers()
-    await startDirectoryWatchers()
-    startAllQueues()
-    await scanDirectories()
-    appLogger.info('Startup complete')
+    eventBus.emit(DB_READY)
   } catch (error) {
     appLogger.exception('Startup failed', error instanceof Error ? error : undefined)
     process.exit(1)

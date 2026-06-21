@@ -89,4 +89,12 @@ export async function ensureDatabaseReady(): Promise<void> {
   `)
 
   log.info('Database initialization complete')
+
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_status ON media(status)`)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_date_taken ON media(date_taken)`)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_created_at ON media(created_at)`)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_file_type ON media(file_type)`)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_source_path ON media(source_path)`)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_media_filepath ON media(filepath)`)
+  log.info('Database indexes ready')
 }

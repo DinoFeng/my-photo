@@ -1,7 +1,7 @@
 import pino from 'pino'
 import type { Logger } from 'pino'
 import { readFileSync } from 'fs'
-import { resolve, dirname } from 'path'
+import { resolve, dirname, basename, sep } from 'path'
 import { fileURLToPath } from 'url'
 import { Transform, Writable } from 'stream'
 import { createStream as createRotatingStream } from 'rotating-file-stream'
@@ -168,7 +168,10 @@ function createFileStream(filepath: string, format?: string, rotation?: boolean 
     ? { ...DEFAULT_ROTATION, ...rotation }
     : { ...DEFAULT_ROTATION }
 
-  const dest = createRotatingStream(filepath, {
+  const dir = dirname(filepath)
+  const base = basename(filepath)
+  const dest = createRotatingStream(base, {
+    path: dir.endsWith(sep) ? dir : dir + sep,
     size: merged.size,
     interval: merged.interval,
     maxFiles: merged.maxFiles,
