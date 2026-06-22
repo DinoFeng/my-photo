@@ -3,31 +3,38 @@ import path from 'path'
 import { performance } from 'perf_hooks'
 import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import { db, scanCheckpoint, media } from '@my-photo/shared'
+import { db, scanCheckpoint, media, config } from '@my-photo/shared'
 import type { ScanPayload, PublishFn } from '@my-photo/shared'
 import { appLogger } from '@my-photo/shared'
 import type { LoggerWithException } from '@my-photo/shared'
 import { setStep, clearStep } from '../utils/stepTracker'
 
-const MEDIA_PATH = path.resolve(process.env.MEDIA_PATH || './media')
+const MEDIA_PATH = config.MEDIA_PATH
 const PUBLISH_BATCH = 50
 
 async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean; exists: boolean }> {
   try {
+    const t_stat = performance.now()
     const stat = await fs.promises.stat(dirPath)
+    const t_db = performance.now()
     const currentMtime = stat.mtimeMs
     const records = await db
       .select()
       .from(scanCheckpoint)
       .where(eq(scanCheckpoint.path, dirPath))
       .limit(1)
+    const t_end = performance.now()
 
     const record = records[0]
     if (!record || record.lastScannedMtime === null) {
       return { changed: true, exists: true }
     }
 
-    return { changed: currentMtime > record.lastScannedMtime, exists: true }
+    const changed = currentMtime > record.lastScannedMtime
+    if (!changed) {
+      appLogger.debug('hasDirectoryChanged', { dirPath, stat: `${(t_db - t_stat).toFixed(0)}ms`, db: `${(t_end - t_db).toFixed(0)}ms`, total: `${(t_end - t_stat).toFixed(0)}ms` })
+    }
+    return { changed, exists: true }
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       return { changed: false, exists: false }
@@ -80,18 +87,24 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
     }))
 
     setStep(dirPath, 'publish')
+    const t_publish_start = performance.now()
     for (let i = 0; i < payloads.length; i += PUBLISH_BATCH) {
       const batch = payloads.slice(i, i + PUBLISH_BATCH)
       const t_batch = performance.now()
       await Promise.all(batch.map((p) => publish(p)))
-      log.debug('Published batch', { dirPath, batchSize: batch.length, time: `${(performance.now() - t_batch).toFixed(0)}ms` })
+      const t_batch_end = performance.now()
+      if (t_batch_end - t_batch > 100) {
+        log.debug('Publish batch slow', { dirPath, batchIndex: i / PUBLISH_BATCH, batchSize: batch.length, time: `${(t_batch_end - t_batch).toFixed(0)}ms` })
+      }
     }
     const t3 = performance.now()
 
     setStep(dirPath, 'complete')
+    const t_stat_start = performance.now()
     const stat = await fs.promises.stat(dirPath)
-    const t4 = performance.now()
+    const t_stat_end = performance.now()
 
+    const t_db_start = performance.now()
     await db
       .update(scanCheckpoint)
       .set({
@@ -101,8 +114,18 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
         updatedAt: new Date().toISOString(),
       })
       .where(eq(scanCheckpoint.path, dirPath))
+    const t4 = performance.now()
 
-    log.info('Published entries from directory', { count: payloads.length, dirPath, checkpoint: `${(t1 - t0).toFixed(0)}ms`, readdir: `${(t2 - t1).toFixed(0)}ms`, publish: `${(t3 - t2).toFixed(0)}ms`, finalize: `${(t4 - t3).toFixed(0)}ms`, total: `${(t4 - t0).toFixed(0)}ms` })
+    log.info('Published entries from directory', {
+      count: payloads.length,
+      dirPath,
+      checkpoint: `${(t1 - t0).toFixed(0)}ms`,
+      readdir: `${(t2 - t1).toFixed(0)}ms`,
+      publish: `${(t3 - t_publish_start).toFixed(0)}ms`,
+      stat: `${(t_stat_end - t_stat_start).toFixed(0)}ms`,
+      finalize_db: `${(t4 - t_db_start).toFixed(0)}ms`,
+      total: `${(t4 - t0).toFixed(0)}ms`,
+    })
   } catch (error: any) {
     await db
       .update(scanCheckpoint)

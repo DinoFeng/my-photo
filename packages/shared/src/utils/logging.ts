@@ -5,7 +5,7 @@ import { resolve, dirname, basename, sep } from 'path'
 import { fileURLToPath } from 'url'
 import { Transform, Writable } from 'stream'
 import { createStream as createRotatingStream } from 'rotating-file-stream'
-import { createConsoleStream, formatLogLine, DEFAULT_FORMAT } from './consoleTransport'
+import { createConsoleStream, formatLogLine, DEFAULT_FORMAT, PINO_BUILTIN_KEYS } from './consoleTransport'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -51,6 +51,13 @@ function wrapLogger(logger: Logger): Logger {
         return function (...args: any[]) {
           if (isPlainObject(args[args.length - 1])) {
             const obj = { ...args.pop() }
+            for (const key of Object.keys(obj)) {
+              if (PINO_BUILTIN_KEYS.has(key)) {
+                const renamed = `_${key}`
+                ;(obj as any)[renamed] = (obj as any)[key]
+                delete (obj as any)[key]
+              }
+            }
             const msg = args[0] as string
             if (typeof msg === 'string' && /\{(\w+)\}/.test(msg)) {
               args[0] = msg.replace(/\{(\w+)\}/g, (_, key) => {
@@ -87,21 +94,21 @@ export interface LoggerWithException extends Logger {
 }
 
 function getCaller(): string {
-  const orig = Error.prepareStackTrace
-  Error.prepareStackTrace = (_, stack) => stack
-  const err = new Error()
-  Error.captureStackTrace(err, getCaller)
-  const stack = err.stack as unknown as NodeJS.CallSite[]
-  Error.prepareStackTrace = orig
+  const stack = new Error().stack
+  if (!stack) return ''
 
-  for (let i = 0; i < stack.length; i++) {
-    const frame = stack[i]
-    const filename = frame.getFileName()
-    if (!filename) continue
-    if (filename.includes('node_modules')) continue
-    if (filename.includes('logging.ts')) continue
-    if (filename.includes('consoleTransport.ts')) continue
-    return `${filename}:${frame.getLineNumber()}`
+  const lines = stack.split('\n')
+  for (let i = 2; i < lines.length; i++) {
+    const line = lines[i]
+    const match = line.match(/at\s+(?:.*?\s+\()?(.+?):(\d+):\d+\)?$/)
+    if (!match) continue
+
+    const filepath = match[1]
+    const lineNum = match[2]
+    if (filepath.includes('node_modules')) continue
+    if (filepath.includes('logging.ts')) continue
+    if (filepath.includes('consoleTransport.ts')) continue
+    return `${filepath}:${lineNum}`
   }
   return ''
 }

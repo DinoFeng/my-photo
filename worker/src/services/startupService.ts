@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { db, scanCheckpoint } from '@my-photo/shared'
+import { db, scanCheckpoint, config } from '@my-photo/shared'
 import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
@@ -8,7 +8,7 @@ import { appLogger } from '@my-photo/shared'
 
 const log = appLogger
 
-const MEDIA_PATH = path.resolve(process.env.MEDIA_PATH || './media')
+const MEDIA_PATH = config.MEDIA_PATH
 
 async function getMediaSubDirectories(): Promise<string[]> {
   try {
@@ -39,12 +39,14 @@ async function scanKnownDirectories(): Promise<void> {
 
     total += checkpoints.length
 
-    await Promise.all(checkpoints.map(cp => {
-      const resolvedPath = path.isAbsolute(cp.path) ? cp.path : path.resolve(MEDIA_PATH, cp.path)
-      return scanDirectory(resolvedPath, publishScanEntry).catch((error: unknown) => {
-        log.exception('扫描已知目录失败', error instanceof Error ? error : undefined, { path: cp.path })
+    await Promise.all(
+      checkpoints.map(async (cp) => {
+        const resolvedPath = path.isAbsolute(cp.path) ? cp.path : path.resolve(MEDIA_PATH, cp.path)
+        await scanDirectory(resolvedPath, publishScanEntry).catch((error: unknown) => {
+          log.exception('扫描已知目录失败', error instanceof Error ? error : undefined, { path: cp.path })
+        })
       })
-    }))
+    )
 
     offset += PAGE_SIZE
   }
@@ -62,7 +64,9 @@ export async function startDirectoryWatchers(): Promise<void> {
   }
   log.info('当前 media 子目录数量', { count: subDirs.length })
 
-  await Promise.all(subDirs.map(dirPath => createFileWatcher(dirPath)))
+  for (const dirPath of subDirs) {
+    await createFileWatcher(dirPath)
+  }
   log.info('所有目录监听已就绪')
 }
 

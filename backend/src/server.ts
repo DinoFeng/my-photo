@@ -1,6 +1,11 @@
 import express, { Express } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.env') })
+
 import apiRoutes from './routes/api/index'
 import sseRoutes from './routes/sse/index'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'

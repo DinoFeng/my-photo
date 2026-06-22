@@ -30,7 +30,7 @@ function formatTime(epoch: number): string {
   return `${y}-${m}-${day} ${h}:${min}:${s}.${ms}`
 }
 
-const PINO_BUILTIN_KEYS = new Set(['level', 'time', 'pid', 'hostname', 'name', 'msg', 'v', 'caller', 'err'])
+export const PINO_BUILTIN_KEYS = new Set(['level', 'time', 'pid', 'hostname', 'name', 'msg', 'v', 'caller', 'err'])
 
 export const DEFAULT_FORMAT = '{time} - {name} - pid:{pid} - {file}[line:{line}] - {level}: {msg}{extra}{err}'
 

@@ -33,13 +33,6 @@ function handleReady(dirPath: string): void {
 
 export function createFileWatcher(dirPath: string): Promise<chokidar.FSWatcher | null> {
   return new Promise((resolve) => {
-    let resolved = false
-    const done = (watcher: chokidar.FSWatcher | null) => {
-      if (resolved) return
-      resolved = true
-      resolve(watcher)
-    }
-
     try {
       const watcher = chokidar.watch(dirPath, {
         persistent: true,
@@ -55,18 +48,11 @@ export function createFileWatcher(dirPath: string): Promise<chokidar.FSWatcher |
       watcher.on('error', (error) => handleError(dirPath, error))
       watcher.on('ready', () => {
         handleReady(dirPath)
-        done(watcher)
+        resolve(watcher)
       })
-
-      setTimeout(() => {
-        if (!resolved) {
-          log.warn('Watcher ready timeout, proceeding anyway', { dirPath })
-          done(watcher)
-        }
-      }, 5000)
     } catch (error: any) {
       log.exception('Failed to create watcher', error instanceof Error ? error : undefined, { dirPath })
-      done(null)
+      resolve(null)
     }
   })
 }

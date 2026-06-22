@@ -3,11 +3,11 @@ import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
 import type { ScanPayload } from '@my-photo/shared';
 import type { UpsertResult } from '@my-photo/shared';
 import type { LoggerLike } from 'queue-manager-pro';
-import { appLogger } from '@my-photo/shared';
+import { appLogger, config } from '@my-photo/shared';
 import { dumpActiveSteps } from '../utils/stepTracker';
 import path from 'path';
 
-const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const dataDir = config.DATA_DIR
 
 function createQueueLogger(name: string): LoggerLike {
   return {
