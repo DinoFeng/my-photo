@@ -1,8 +1,7 @@
 import { Request, Response } from 'express'
 import { like, and, eq, sql } from 'drizzle-orm'
-import { db } from '../db/index'
-import { media } from '../db/schema'
-import { appLogger } from '../utils/logging'
+import { db, media } from '@my-photo/shared'
+import { appLogger } from '@my-photo/shared'
 
 const log = appLogger
 

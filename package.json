@@ -4,14 +4,17 @@
   "description": "NAS Photo Manager - A photo management application for NAS devices",
   "type": "module",
   "scripts": {
-    "install:all": "pnpm install && cd backend && pnpm install && cd ../frontend && pnpm install",
+    "install:all": "pnpm install",
     "dev": "concurrently \"cd backend && pnpm dev\" \"cd frontend && pnpm dev\"",
     "dev:backend": "cd backend && pnpm dev",
+    "dev:worker": "cd worker && pnpm dev",
     "dev:frontend": "cd frontend && pnpm dev",
     "build:backend": "cd backend && pnpm build",
+    "build:worker": "cd worker && pnpm build",
     "build:frontend": "cd frontend && pnpm build",
-    "prisma:generate": "cd backend && pnpm prisma generate",
-    "prisma:push": "cd backend && pnpm prisma db push"
+    "build": "pnpm run build:backend && pnpm run build:worker && pnpm run build:frontend",
+    "db:generate": "cd backend && pnpm db:generate",
+    "db:push": "cd backend && pnpm db:push"
   },
   "keywords": [
     "photo",

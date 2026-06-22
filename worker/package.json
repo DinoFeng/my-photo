@@ -1,0 +1,30 @@
+{
+  "name": "nas-photo-manager-worker",
+  "version": "1.0.0",
+  "description": "Processing Worker for NAS Photo Manager",
+  "type": "module",
+  "main": "dist/worker.js",
+  "scripts": {
+    "start": "node dist/worker.js",
+    "dev": "tsx watch src/worker.ts",
+    "build": "tsup src/worker.ts --format esm --dts --clean --out-dir dist"
+  },
+  "dependencies": {
+    "@my-photo/shared": "workspace:*",
+    "@libsql/client": "^0.17.3",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.1",
+    "drizzle-orm": "^0.45.2",
+    "exifreader": "^4.15.0",
+    "queue-manager-pro": "^1.0.0",
+    "sharp": "^0.33.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/uuid": "^9.0.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.5.4"
+  }
+}

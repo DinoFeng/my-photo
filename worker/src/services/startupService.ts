@@ -1,15 +1,14 @@
 import fs from 'fs'
 import path from 'path'
-import { db as drizzleDb } from '../db/index'
-import { scanCheckpoint } from '../db/schema'
+import { db, scanCheckpoint } from '@my-photo/shared'
 import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
-import { appLogger } from '../utils/logging'
+import { appLogger } from '@my-photo/shared'
 
 const log = appLogger
 
-const MEDIA_PATH = process.env.MEDIA_PATH || './media'
+const MEDIA_PATH = path.resolve(process.env.MEDIA_PATH || './media')
 
 async function getMediaSubDirectories(): Promise<string[]> {
   try {
@@ -29,7 +28,7 @@ async function scanKnownDirectories(): Promise<void> {
   let total = 0
 
   while (true) {
-    const checkpoints = await drizzleDb
+    const checkpoints = await db
       .select()
       .from(scanCheckpoint)
       .limit(PAGE_SIZE)
@@ -40,11 +39,12 @@ async function scanKnownDirectories(): Promise<void> {
 
     total += checkpoints.length
 
-    await Promise.all(checkpoints.map(cp =>
-      scanDirectory(cp.path, publishScanEntry).catch((error: unknown) => {
+    await Promise.all(checkpoints.map(cp => {
+      const resolvedPath = path.isAbsolute(cp.path) ? cp.path : path.resolve(MEDIA_PATH, cp.path)
+      return scanDirectory(resolvedPath, publishScanEntry).catch((error: unknown) => {
         log.exception('扫描已知目录失败', error instanceof Error ? error : undefined, { path: cp.path })
       })
-    ))
+    }))
 
     offset += PAGE_SIZE
   }

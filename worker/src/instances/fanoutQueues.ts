@@ -1,13 +1,13 @@
 import { EventFanoutManager } from '../utils/eventFanoutManager';
 import { SqliteQueueRepository } from '../repositories/SqliteQueueRepository';
-import type { ScanPayload } from '../types/fanout';
-import type { UpsertResult } from '../types/media';
+import type { ScanPayload } from '@my-photo/shared';
+import type { UpsertResult } from '@my-photo/shared';
 import type { LoggerLike } from 'queue-manager-pro';
-import { appLogger } from '../utils/logging';
+import { appLogger } from '@my-photo/shared';
 import { dumpActiveSteps } from '../utils/stepTracker';
 import path from 'path';
 
-const dataDir = path.join(process.cwd(), 'data');
+const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
 function createQueueLogger(name: string): LoggerLike {
   return {
@@ -98,57 +98,5 @@ export async function publishScanEntry(payload: ScanPayload): Promise<void> {
 }
 
 export async function publishImportEntry(_payload: UpsertResult): Promise<void> {
-  // 预留：read-file 完成后发布到下游队列
+  // 预留：read-file 完成后发布到下游队列（thumbnail / face-detect）
 }
-
-// export const exportFanout = new EventFanoutManager('export', [
-//   {
-//     name: 'export-primary',
-//     options: {
-//       backend: { type: 'file', filePath: path.join(dataDir, 'export-primary.json') },
-//       delay: 1000,
-//       maxRetries: 2,
-//       maxProcessingTime: 300000,
-//       concurrency: 2
-//     }
-//   }
-// ]);
-
-// export const sourceFileAddFanout = new EventFanoutManager('source-file-add', [
-//   {
-//     name: 'source-file-add-primary',
-//     options: {
-//       backend: { type: 'file', filePath: path.join(dataDir, 'source-file-add.json') },
-//       delay: 500,
-//       maxRetries: 2,
-//       maxProcessingTime: 30000,
-//       concurrency: 3
-//     }
-//   }
-// ]);
-
-// export const sourceFileChangeFanout = new EventFanoutManager('source-file-change', [
-//   {
-//     name: 'source-file-change-primary',
-//     options: {
-//       backend: { type: 'file', filePath: path.join(dataDir, 'source-file-change.json') },
-//       delay: 500,
-//       maxRetries: 2,
-//       maxProcessingTime: 30000,
-//       concurrency: 2
-//     }
-//   }
-// ]);
-
-// export const sourceFileRemoveFanout = new EventFanoutManager('source-file-remove', [
-//   {
-//     name: 'source-file-remove-primary',
-//     options: {
-//       backend: { type: 'file', filePath: path.join(dataDir, 'source-file-remove.json') },
-//       delay: 500,
-//       maxRetries: 2,
-//       maxProcessingTime: 30000,
-//       concurrency: 2
-//     }
-//   }
-// ]);

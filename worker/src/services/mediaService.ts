@@ -3,13 +3,12 @@ import path from 'path'
 import { performance } from 'perf_hooks'
 import { v4 as uuidv4 } from 'uuid'
 import { eq } from 'drizzle-orm'
-import type { ScanPayload } from '../types/fanout'
-import type { UpsertResult } from '../types/media'
+import type { ScanPayload } from '@my-photo/shared'
+import type { UpsertResult } from '@my-photo/shared'
 import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '../utils/fileUtils'
-import { db } from '../db/index'
-import { media } from '../db/schema'
-import { appLogger } from '../utils/logging'
-import type { LoggerWithException } from '../utils/logging'
+import { db, media } from '@my-photo/shared'
+import { appLogger } from '@my-photo/shared'
+import type { LoggerWithException } from '@my-photo/shared'
 import { setStep, clearStep } from '../utils/stepTracker'
 
 interface MediaData {
@@ -150,7 +149,6 @@ export async function processReadFile(
     return
   }
   try {
-    throw new Error('Exif metadata not implemented')
     setStep(payload.currentPath, 'db')
     const t_db0 = performance.now()
     const existing = await db

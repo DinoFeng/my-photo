@@ -3,24 +3,20 @@ import path from 'path'
 import { performance } from 'perf_hooks'
 import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import { db as drizzleDb } from '../db/index'
-import { scanCheckpoint, media } from '../db/schema'
-import type { ScanPayload, PublishFn } from '../types/fanout'
-import { appLogger } from '../utils/logging'
-import type { LoggerWithException } from '../utils/logging'
+import { db, scanCheckpoint, media } from '@my-photo/shared'
+import type { ScanPayload, PublishFn } from '@my-photo/shared'
+import { appLogger } from '@my-photo/shared'
+import type { LoggerWithException } from '@my-photo/shared'
 import { setStep, clearStep } from '../utils/stepTracker'
 
-const MEDIA_PATH = process.env.MEDIA_PATH || './media'
+const MEDIA_PATH = path.resolve(process.env.MEDIA_PATH || './media')
 const PUBLISH_BATCH = 50
 
-/**
- * 检查目录是否有变化（当前 mtime > 上次扫描时记录的 mtime）
- */
 async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean; exists: boolean }> {
   try {
     const stat = await fs.promises.stat(dirPath)
     const currentMtime = stat.mtimeMs
-    const records = await drizzleDb
+    const records = await db
       .select()
       .from(scanCheckpoint)
       .where(eq(scanCheckpoint.path, dirPath))
@@ -40,16 +36,13 @@ async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean;
   }
 }
 
-/**
- * 处理目录：创建 checkpoint、读取内容、发布到队列
- */
 async function processDirectory(dirPath: string, publish: PublishFn, opts?: { logger?: LoggerWithException }): Promise<void> {
   const now = new Date().toISOString()
   const log = opts?.logger ?? appLogger
   const t0 = performance.now()
 
   setStep(dirPath, 'checkpoint')
-  const existing = await drizzleDb
+  const existing = await db
     .select()
     .from(scanCheckpoint)
     .where(eq(scanCheckpoint.path, dirPath))
@@ -59,7 +52,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
     const relativePath = path.relative(MEDIA_PATH, dirPath)
     const isRoot = relativePath !== '' && !relativePath.includes(path.sep)
 
-    await drizzleDb.insert(scanCheckpoint).values({
+    await db.insert(scanCheckpoint).values({
       id: uuidv4(),
       path: dirPath,
       isRoot,
@@ -68,7 +61,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
       updatedAt: now,
     })
   } else {
-    await drizzleDb
+    await db
       .update(scanCheckpoint)
       .set({ status: 'scanning', updatedAt: now })
       .where(eq(scanCheckpoint.path, dirPath))
@@ -99,7 +92,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
     const stat = await fs.promises.stat(dirPath)
     const t4 = performance.now()
 
-    await drizzleDb
+    await db
       .update(scanCheckpoint)
       .set({
         lastScannedMtime: stat.mtimeMs,
@@ -111,7 +104,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
 
     log.info('Published entries from directory', { count: payloads.length, dirPath, checkpoint: `${(t1 - t0).toFixed(0)}ms`, readdir: `${(t2 - t1).toFixed(0)}ms`, publish: `${(t3 - t2).toFixed(0)}ms`, finalize: `${(t4 - t3).toFixed(0)}ms`, total: `${(t4 - t0).toFixed(0)}ms` })
   } catch (error: any) {
-    await drizzleDb
+    await db
       .update(scanCheckpoint)
       .set({
         status: 'error',
@@ -126,10 +119,6 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
   }
 }
 
-/**
- * 扫描目录并发布所有子项到队列
- * 返回是否成功扫描（有变化并已发布）
- */
 export async function scanDirectory(dirPath: string, publish: PublishFn, opts?: { logger?: LoggerWithException }): Promise<boolean> {
   const log = opts?.logger ?? appLogger
   const t0 = performance.now()
@@ -155,14 +144,11 @@ export async function scanDirectory(dirPath: string, publish: PublishFn, opts?: 
   return true
 }
 
-/**
- * 删除目录相关的所有记录：media 表文件 + checkpoint 表（含子目录）
- */
 export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
   const likePath = `${dirPath}%`
 
-  await drizzleDb.delete(media).where(like(media.filepath, likePath))
-  await drizzleDb.delete(scanCheckpoint).where(like(scanCheckpoint.path, likePath))
+  await db.delete(media).where(like(media.filepath, likePath))
+  await db.delete(scanCheckpoint).where(like(scanCheckpoint.path, likePath))
 
   appLogger.info('Cleaned up records for deleted directory', { dirPath })
 }

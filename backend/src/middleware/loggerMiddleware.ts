@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { accessLogger } from '../utils/logging'
+import { accessLogger } from '@my-photo/shared'
 
 export function accessLoggerMiddleware(req: Request, res: Response, next: NextFunction) {
   const { method, originalUrl, ip } = req

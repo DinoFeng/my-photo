@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { appLogger } from '../utils/logging'
+import { appLogger } from '@my-photo/shared'
 // import { exportFanout } from '../instances/fanoutQueues'
 
 const log = appLogger

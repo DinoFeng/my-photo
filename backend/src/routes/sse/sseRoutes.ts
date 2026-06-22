@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { monitorService, mediaUpdateService } from '../../instances/sse';
-import { appLogger } from '../../utils/logging';
+import { appLogger } from '@my-photo/shared';
 
 const router: Router = Router();
 

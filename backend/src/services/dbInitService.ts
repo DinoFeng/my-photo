@@ -1,8 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import { sql } from 'drizzle-orm'
-import { db } from '../db/index.js'
-import { appLogger } from '../utils/logging'
+import { db } from '@my-photo/shared'
+import { appLogger } from '@my-photo/shared'
 
 const log = appLogger
 

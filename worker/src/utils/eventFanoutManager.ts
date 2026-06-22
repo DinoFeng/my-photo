@@ -1,5 +1,5 @@
 import { QueueManager } from 'queue-manager-pro';
-import type { SubscriberQueueConfig, QueueConfig, Handler, HandlerMap } from '../types/fanout';
+import type { SubscriberQueueConfig, QueueConfig, Handler, HandlerMap } from '@my-photo/shared';
 
 export class EventFanoutManager<H extends HandlerMap = HandlerMap> {
     private queues: Map<string, QueueManager<H>> = new Map();

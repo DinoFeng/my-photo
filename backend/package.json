@@ -13,18 +13,13 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@my-photo/shared": "workspace:*",
     "@libsql/client": "^0.17.3",
-    "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "drizzle-orm": "^0.45.2",
-    "exifreader": "^4.15.0",
     "express": "^4.18.2",
-    "pino": "^10.3.1",
-    "queue-manager-pro": "^1.0.0",
-    "rotating-file-stream": "^3.2.9",
-    "sharp": "^0.33.2",
-    "uuid": "^9.0.0"
+    "pino": "^10.3.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

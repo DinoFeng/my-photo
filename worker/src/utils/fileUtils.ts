@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import ExifReader from 'exifreader'
-import { appLogger } from './logging'
+import { appLogger } from '@my-photo/shared'
 
 const HASH_SAMPLE_SIZE = 64 * 1024
 const EXIF_READ_SIZE = 128 * 1024
@@ -34,8 +34,8 @@ export async function calculateFileHash(filePath: string): Promise<string> {
 
 function parseExifDate(dateStr: string): Date | null {
   const normalized = dateStr
-    .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')  // "2024:01:15" → "2024-01-15"
-    .replace(' ', 'T')                                   // "10:30:00" 前加 T
+    .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+    .replace(' ', 'T')
   const d = new Date(normalized)
   return isNaN(d.getTime()) ? null : d
 }
@@ -53,7 +53,7 @@ export async function getFileMetadata(filePath: string): Promise<{
 }> {
   try {
     const tags = await ExifReader.load(filePath, { length: EXIF_READ_SIZE })
-    
+
     const result: {
       width?: number
       height?: number
@@ -70,7 +70,7 @@ export async function getFileMetadata(filePath: string): Promise<{
     if (tags['Image Height']) result.height = Number(tags['Image Height'].value)
     if (tags['Make']) result.make = tags['Make'].description
     if (tags['Model']) result.model = tags['Model'].description
-    
+
     if (tags['DateTimeOriginal']) {
       result.dateTaken = parseExifDate(String(tags['DateTimeOriginal'].description)) ?? undefined
     }

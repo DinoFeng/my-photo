@@ -1,0 +1,25 @@
+{
+  "format": "{time} - {name} - {file}[line:{line}] - {level}: {msg}{extra}{err}",
+  "handlers": {
+    "console": {
+      "type": "console",
+      "level": "DEBUG"
+    },
+    "file": {
+      "type": "file",
+      "filename": "./logs/worker.log",
+      "level": "INFO"
+    },
+    "errorFile": {
+      "type": "file",
+      "filename": "./logs/worker-error.log",
+      "level": "ERROR"
+    }
+  },
+  "loggers": {
+    "app": {
+      "level": "DEBUG",
+      "handlers": ["console", "file", "errorFile"]
+    }
+  }
+}

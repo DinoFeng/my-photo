@@ -140,7 +140,8 @@ export interface LoggingConfig {
 }
 
 function loadConfig(): LoggingConfig {
-  const configPath = resolve(__dirname, '../../logging.json')
+  const configPath = process.env.LOGGING_CONFIG_PATH
+    || resolve(process.cwd(), 'logging.json')
   const raw = readFileSync(configPath, 'utf-8')
   return JSON.parse(raw)
 }

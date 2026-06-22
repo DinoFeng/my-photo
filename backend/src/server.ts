@@ -5,12 +5,9 @@ import apiRoutes from './routes/api/index'
 import sseRoutes from './routes/sse/index'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
-import { appLogger } from './utils/logging'
+import { appLogger } from '@my-photo/shared'
 import { ensureDatabaseReady } from './services/dbInitService'
-import { registerEventHandlers } from './listeners/eventHandlers'
 import { monitorService } from './instances/sse'
-import { eventBus } from './instances/eventBus'
-import { DB_READY } from './utils/eventBus'
 
 dotenv.config()
 
@@ -30,10 +27,8 @@ app.use(notFoundHandler)
 app.use(errorLogger)
 app.use(errorHandler)
 
-registerEventHandlers()
-
 app.listen(PORT, async () => {
-  appLogger.info(`Server running on port ${PORT}`)
+  appLogger.info(`API Server running on port ${PORT}`)
   try {
     await ensureDatabaseReady()
     app.locals.isReady = true
@@ -41,9 +36,7 @@ app.listen(PORT, async () => {
       event: 'ready',
       data: { status: 'ready', timestamp: new Date().toISOString() },
     })
-    appLogger.info('API ready')
-
-    eventBus.emit(DB_READY)
+    appLogger.info('API Server ready')
   } catch (error) {
     appLogger.exception('Startup failed', error instanceof Error ? error : undefined)
     process.exit(1)
