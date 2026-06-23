@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import type { ScanPayload } from '@my-photo/shared'
 import type { UpsertResult } from '@my-photo/shared'
 import { isMediaFile, getFileType, calculateFileHash, getFileMetadata } from '../utils/fileUtils'
-import { db, media } from '@my-photo/shared'
+import { db, media, toMediaRelativePath } from '@my-photo/shared'
 import { appLogger } from '@my-photo/shared'
 import type { LoggerWithException } from '@my-photo/shared'
 import { setStep, clearStep } from '../utils/stepTracker'
@@ -149,12 +149,14 @@ export async function processReadFile(
     return
   }
   try {
+    const relativeFilepath = toMediaRelativePath(payload.currentPath)
+
     setStep(payload.currentPath, 'db')
     const t_db0 = performance.now()
     const existing = await db
       .select({ id: media.id, hash: media.hash })
       .from(media)
-      .where(eq(media.filepath, payload.currentPath))
+      .where(eq(media.filepath, relativeFilepath))
       .limit(1)
     const t_db1 = performance.now()
 
@@ -181,7 +183,7 @@ export async function processReadFile(
 
     setStep(payload.currentPath, 'upsert')
     const mediaData = buildMediaData(stat, hash, metadata, fileType, filename, now)
-    const result = await upsertMedia(payload.currentPath, payload.sourcePath, mediaData, existing[0]?.id)
+    const result = await upsertMedia(relativeFilepath, payload.sourcePath, mediaData, existing[0]?.id)
     const t_upsert1 = performance.now()
 
     log.info('Media file processed', {

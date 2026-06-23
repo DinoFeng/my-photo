@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { db, scanCheckpoint, config } from '@my-photo/shared'
+import { db, scanCheckpoint, config, resolveMediaPath } from '@my-photo/shared'
 import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
@@ -41,7 +41,7 @@ async function scanKnownDirectories(): Promise<void> {
 
     await Promise.all(
       checkpoints.map(async (cp) => {
-        const resolvedPath = path.isAbsolute(cp.path) ? cp.path : path.resolve(MEDIA_PATH, cp.path)
+        const resolvedPath = path.isAbsolute(cp.path) ? cp.path : resolveMediaPath(cp.path)
         await scanDirectory(resolvedPath, publishScanEntry).catch((error: unknown) => {
           log.exception('扫描已知目录失败', error instanceof Error ? error : undefined, { path: cp.path })
         })

@@ -3,7 +3,7 @@ import path from 'path'
 import { performance } from 'perf_hooks'
 import { eq, like } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
-import { db, scanCheckpoint, media, config } from '@my-photo/shared'
+import { db, scanCheckpoint, media, config, toMediaRelativePath } from '@my-photo/shared'
 import type { ScanPayload, PublishFn } from '@my-photo/shared'
 import { appLogger } from '@my-photo/shared'
 import type { LoggerWithException } from '@my-photo/shared'
@@ -18,10 +18,11 @@ async function hasDirectoryChanged(dirPath: string): Promise<{ changed: boolean;
     const stat = await fs.promises.stat(dirPath)
     const t_db = performance.now()
     const currentMtime = stat.mtimeMs
+    const relativePath = toMediaRelativePath(dirPath)
     const records = await db
       .select()
       .from(scanCheckpoint)
-      .where(eq(scanCheckpoint.path, dirPath))
+      .where(eq(scanCheckpoint.path, relativePath))
       .limit(1)
     const t_end = performance.now()
 
@@ -47,21 +48,21 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
   const now = new Date().toISOString()
   const log = opts?.logger ?? appLogger
   const t0 = performance.now()
+  const relativeDirPath = toMediaRelativePath(dirPath)
 
   setStep(dirPath, 'checkpoint')
   const existing = await db
     .select()
     .from(scanCheckpoint)
-    .where(eq(scanCheckpoint.path, dirPath))
+    .where(eq(scanCheckpoint.path, relativeDirPath))
     .limit(1)
 
   if (existing.length === 0) {
-    const relativePath = path.relative(MEDIA_PATH, dirPath)
-    const isRoot = relativePath !== '' && !relativePath.includes(path.sep)
+    const isRoot = relativeDirPath !== '' && !relativeDirPath.includes(path.sep)
 
     await db.insert(scanCheckpoint).values({
       id: uuidv4(),
-      path: dirPath,
+      path: relativeDirPath,
       isRoot,
       status: 'scanning',
       createdAt: now,
@@ -71,7 +72,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
     await db
       .update(scanCheckpoint)
       .set({ status: 'scanning', updatedAt: now })
-      .where(eq(scanCheckpoint.path, dirPath))
+      .where(eq(scanCheckpoint.path, relativeDirPath))
   }
   const t1 = performance.now()
 
@@ -83,7 +84,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
     const payloads: ScanPayload[] = entries.map((entry) => ({
       currentPath: path.join(dirPath, entry.name),
       type: entry.isDirectory() ? 'directory' : 'file',
-      sourcePath: dirPath,
+      sourcePath: relativeDirPath,
     }))
 
     setStep(dirPath, 'publish')
@@ -113,7 +114,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
         completedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(scanCheckpoint.path, dirPath))
+      .where(eq(scanCheckpoint.path, relativeDirPath))
     const t4 = performance.now()
 
     log.info('Published entries from directory', {
@@ -134,7 +135,7 @@ async function processDirectory(dirPath: string, publish: PublishFn, opts?: { lo
         errorCount: (existing[0]?.errorCount ?? 0) + 1,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(scanCheckpoint.path, dirPath))
+      .where(eq(scanCheckpoint.path, relativeDirPath))
 
     log.exception('Failed to process directory', error instanceof Error ? error : undefined, { dirPath })
   } finally {
@@ -168,7 +169,8 @@ export async function scanDirectory(dirPath: string, publish: PublishFn, opts?: 
 }
 
 export async function deleteDirectoryRecords(dirPath: string): Promise<void> {
-  const likePath = `${dirPath}%`
+  const relativePath = toMediaRelativePath(dirPath)
+  const likePath = `${relativePath}%`
 
   await db.delete(media).where(like(media.filepath, likePath))
   await db.delete(scanCheckpoint).where(like(scanCheckpoint.path, likePath))

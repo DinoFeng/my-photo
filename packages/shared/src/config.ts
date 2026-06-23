@@ -42,3 +42,11 @@ export const config = {
   DATA_DIR: resolvePath(process.env.DATA_DIR, './backend/data'),
   DATABASE_URL: resolveDatabaseUrl(),
 }
+
+export function resolveMediaPath(relativePath: string): string {
+  return path.join(config.MEDIA_PATH, relativePath)
+}
+
+export function toMediaRelativePath(absolutePath: string): string {
+  return path.relative(config.MEDIA_PATH, absolutePath)
+}
