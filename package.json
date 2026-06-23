@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "install:all": "pnpm install",
-    "dev": "concurrently -n api,worker,web -c blue,green,cyan \"cd backend && pnpm dev\" \"cd worker && pnpm dev\" \"cd frontend && pnpm dev\"",
+    "dev": "node scripts/dev-runner.mjs",
     "dev:backend": "cd backend && pnpm dev",
     "dev:worker": "cd worker && pnpm dev",
     "dev:frontend": "cd frontend && pnpm dev",

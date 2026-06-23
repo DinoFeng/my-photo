@@ -12,13 +12,16 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddlewa
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
 import { appLogger } from '@my-photo/shared'
 import { ensureDatabaseReady } from './services/dbInitService'
-import { monitorService } from './instances/sse'
+import { monitorService, broadcastTask } from './instances/sse'
+import { WsClient } from './utils/wsClient'
 
 dotenv.config()
 
 const app: Express = express()
 app.locals.isReady = false
-const PORT = process.env.PORT || 3000
+const PORT = parseInt(process.env.PORT || '3000', 10)
+const HOST = process.env.HOST || '0.0.0.0'
+const WS_HUB_URL = process.env.WS_HUB_URL || 'ws://localhost:3001'
 
 app.use(accessLoggerMiddleware)
 app.use(cors())
@@ -32,16 +35,29 @@ app.use(notFoundHandler)
 app.use(errorLogger)
 app.use(errorHandler)
 
-app.listen(PORT, async () => {
+app.listen(PORT, HOST, async () => {
   appLogger.info(`API Server running on port ${PORT}`)
   try {
     await ensureDatabaseReady()
-    app.locals.isReady = true
-    monitorService.broadcast({
-      event: 'ready',
-      data: { status: 'ready', timestamp: new Date().toISOString() },
+    appLogger.info('Database ready, connecting to WS Hub')
+
+    const wsClient = new WsClient(WS_HUB_URL, 'backend')
+    app.locals.wsClient = wsClient
+
+    wsClient.onNotify((message) => {
+      broadcastTask(message.event, message.queue, message.payload, message.error)
     })
-    appLogger.info('API Server ready')
+
+    wsClient.onReady(() => {
+      app.locals.isReady = true
+      monitorService.broadcast({
+        event: 'ready',
+        data: { status: 'ready', timestamp: new Date().toISOString() },
+      })
+      appLogger.info('API Server ready')
+    })
+
+    wsClient.connect()
   } catch (error) {
     appLogger.exception('Startup failed', error instanceof Error ? error : undefined)
     process.exit(1)

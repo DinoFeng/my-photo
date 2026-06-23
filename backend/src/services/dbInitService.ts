@@ -1,12 +1,10 @@
 import fs from 'fs'
-import path from 'path'
 import { sql } from 'drizzle-orm'
-import { db } from '@my-photo/shared'
-import { appLogger } from '@my-photo/shared'
+import { db, config, appLogger } from '@my-photo/shared'
 
 const log = appLogger
 
-const DATA_DIR = path.join(process.cwd(), 'data')
+const DATA_DIR = config.DATA_DIR
 
 const ALL_TABLES = ['media', 'scan_checkpoint', 'setting'] as const
 

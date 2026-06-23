@@ -10,19 +10,21 @@
     "build": "tsup src/worker.ts --format esm --dts --clean --out-dir dist"
   },
   "dependencies": {
-    "@my-photo/shared": "workspace:*",
     "@libsql/client": "^0.17.3",
+    "@my-photo/shared": "workspace:*",
     "chokidar": "^3.6.0",
     "dotenv": "^16.4.1",
     "drizzle-orm": "^0.45.2",
     "exifreader": "^4.15.0",
     "queue-manager-pro": "^1.0.0",
     "sharp": "^0.33.2",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^5.5.4"

@@ -4,20 +4,21 @@ import { processScanFolder } from '../services/scanService'
 import { processReadFile } from '../services/mediaService'
 import { appLogger } from '@my-photo/shared'
 import type { LoggerWithException } from '@my-photo/shared'
+import type { WsHub } from '../utils/wsHub'
 
 const log = appLogger
 
-const API_INTERNAL_URL = process.env.API_INTERNAL_URL || 'http://localhost:3000'
+let wsHub: WsHub | null = null
 
 async function notifyAPI(event: string, type: string, payload: any, error?: string): Promise<void> {
-  try {
-    await fetch(`${API_INTERNAL_URL}/api/internal/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event, type, payload, error }),
+  if (wsHub) {
+    wsHub.sendToBackend({
+      type: 'notify',
+      event: event as any,
+      queue: type,
+      payload,
+      error,
     })
-  } catch {
-    // 通知失败不影响主流程
   }
 }
 
@@ -60,7 +61,8 @@ function createQueueHandler(
   }
 }
 
-export function registerQueueHandlers(): void {
+export function registerQueueHandlers(hub: WsHub): void {
+  wsHub = hub
   folderFanout.register('scan-folder', createQueueHandler('scan-folder', 2, (payload, opts) => processScanFolder(payload, publishScanEntry, opts)))
   fileFanout.register('read-file', createQueueHandler('read-file', 3, (payload, opts) => processReadFile(payload, publishImportEntry, opts)))
 }

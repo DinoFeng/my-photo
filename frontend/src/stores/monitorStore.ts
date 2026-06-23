@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { sseRequest } from '../utils/apiClient'
 
 export interface MonitorEvent {
   event: string
@@ -10,7 +11,7 @@ export interface MonitorEvent {
 export const useMonitorStore = defineStore('monitor', () => {
   const events = ref<MonitorEvent[]>([])
   const isConnected = ref(false)
-  let eventSource: EventSource | null = null
+  let sseAbortController: AbortController | null = null
 
   const addEvent = (event: string, data: any) => {
     const monitorEvent: MonitorEvent = {
@@ -19,65 +20,51 @@ export const useMonitorStore = defineStore('monitor', () => {
       timestamp: new Date()
     }
     events.value.unshift(monitorEvent)
-    // 只保留最近 100 条事件
     if (events.value.length > 100) {
       events.value = events.value.slice(0, 100)
     }
     console.log(`[Monitor] ${event}:`, data)
   }
 
-  const connect = () => {
-    if (eventSource) return
+  const connect = async () => {
+    if (sseAbortController) return
 
-    eventSource = new EventSource('/sse/connect')
+    const controller = new AbortController()
+    sseAbortController = controller
 
-    eventSource.addEventListener('connected', (e) => {
-      console.log('[Monitor] SSE connected:', JSON.parse(e.data))
-      isConnected.value = true
-      addEvent('connected', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('file-add', (e) => {
-      addEvent('file-add', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('file-change', (e) => {
-      addEvent('file-change', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('file-remove', (e) => {
-      addEvent('file-remove', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('import-file-add', (e) => {
-      addEvent('import-file-add', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('task-start', (e) => {
-      addEvent('task-start', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('task-complete', (e) => {
-      addEvent('task-complete', JSON.parse(e.data))
-    })
-
-    eventSource.addEventListener('task-error', (e) => {
-      addEvent('task-error', JSON.parse(e.data))
-    })
-
-    eventSource.onerror = () => {
-      console.error('[Monitor] SSE error, reconnecting...')
+    try {
+      await sseRequest(
+        '/connect',
+        {
+          'connected': (data: any) => {
+            isConnected.value = true
+            addEvent('connected', data)
+          },
+          'file-add': (data: any) => addEvent('file-add', data),
+          'file-change': (data: any) => addEvent('file-change', data),
+          'file-remove': (data: any) => addEvent('file-remove', data),
+          'import-file-add': (data: any) => addEvent('import-file-add', data),
+          'task-start': (data: any) => addEvent('task-start', data),
+          'task-complete': (data: any) => addEvent('task-complete', data),
+          'task-error': (data: any) => addEvent('task-error', data),
+        },
+        controller.signal
+      )
+    } catch (error) {
+      console.error('[Monitor] SSE connection failed:', error)
       isConnected.value = false
-      disconnect()
-      // 5秒后重连
-      setTimeout(() => connect(), 5000)
+    } finally {
+      if (sseAbortController === controller) {
+        sseAbortController = null
+      }
+      isConnected.value = false
     }
   }
 
   const disconnect = () => {
-    if (eventSource) {
-      eventSource.close()
-      eventSource = null
+    if (sseAbortController) {
+      sseAbortController.abort()
+      sseAbortController = null
     }
   }
 

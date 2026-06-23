@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { createClient } from '@libsql/client'
 import { db, scanCheckpoint, config, resolveMediaPath } from '@my-photo/shared'
 import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
@@ -7,6 +8,37 @@ import { createFileWatcher } from '../listeners/fileWatcher'
 import { appLogger } from '@my-photo/shared'
 
 const log = appLogger
+
+const QUEUE_FILE_TABLES = [
+  { file: 'scan-folder.db', table: 'scan_tasks' },
+  { file: 'read-file.db', table: 'read_file_tasks' },
+]
+
+export async function recoverQueueTasks(): Promise<void> {
+  log.info('恢复队列中断任务...')
+
+  for (const { file, table } of QUEUE_FILE_TABLES) {
+    const dbPath = path.join(config.DATA_DIR, file)
+    if (!fs.existsSync(dbPath)) {
+      log.info('队列文件不存在，跳过', { file })
+      continue
+    }
+
+    const client = createClient({ url: `file:${dbPath}` })
+    try {
+      const result = await client.execute(
+        `UPDATE ${table} SET status = 'pending' WHERE status = 'processing'`
+      )
+      if (result.rowsAffected > 0) {
+        log.info('恢复中断任务', { file, table, count: result.rowsAffected })
+      }
+    } finally {
+      client.close()
+    }
+  }
+
+  log.info('队列恢复完成')
+}
 
 const MEDIA_PATH = config.MEDIA_PATH
 
@@ -64,9 +96,7 @@ export async function startDirectoryWatchers(): Promise<void> {
   }
   log.info('当前 media 子目录数量', { count: subDirs.length })
 
-  for (const dirPath of subDirs) {
-    await createFileWatcher(dirPath)
-  }
+  await Promise.all(subDirs.map(dirPath => createFileWatcher(dirPath)))
   log.info('所有目录监听已就绪')
 }
 

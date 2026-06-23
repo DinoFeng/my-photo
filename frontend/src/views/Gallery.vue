@@ -48,15 +48,11 @@
           >
             <div class="card-image">
               <img
-                v-if="item.thumbnailPath"
-                :src="`/${item.thumbnailPath}`"
+                :src="getThumbnailUrl(item.id, item.fileType)"
                 :alt="item.filename"
                 loading="lazy"
                 @error="onImageError"
               />
-              <div v-else class="card-placeholder">
-                <Image :size="32" />
-              </div>
               <div v-if="item.fileType === 'video'" class="video-badge">
                 <Play :size="16" />
               </div>
@@ -148,10 +144,28 @@ function onSearchInput() {
 function onImageError(e: Event) {
   const img = e.target as HTMLImageElement
   img.style.display = 'none'
-  const placeholder = img.parentElement?.querySelector('.card-placeholder')
-  if (placeholder) {
-    ;(placeholder as HTMLElement).style.display = 'flex'
+  const parent = img.parentElement
+  if (parent) {
+    const existing = parent.querySelector('.card-placeholder')
+    if (!existing) {
+      const placeholder = document.createElement('div')
+      placeholder.className = 'card-placeholder'
+      placeholder.style.display = 'flex'
+      placeholder.style.alignItems = 'center'
+      placeholder.style.justifyContent = 'center'
+      placeholder.style.height = '120px'
+      placeholder.style.color = '#585b70'
+      placeholder.textContent = '加载失败'
+      parent.appendChild(placeholder)
+    } else {
+      ;(existing as HTMLElement).style.display = 'flex'
+    }
   }
+}
+
+function getThumbnailUrl(id: string, fileType?: string | null): string {
+  const size = fileType === 'video' ? 400 : 300
+  return `/api/media/${id}/thumbnail?size=${size}`
 }
 
 function openDetail(item: Media) {
