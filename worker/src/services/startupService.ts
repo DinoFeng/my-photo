@@ -6,6 +6,7 @@ import { scanDirectory } from '../services/scanService'
 import { publishScanEntry } from '../instances/fanoutQueues'
 import { createFileWatcher } from '../listeners/fileWatcher'
 import { appLogger } from '@my-photo/shared'
+import { HASH_ALGORITHM } from '../utils/fileUtils'
 
 const log = appLogger
 

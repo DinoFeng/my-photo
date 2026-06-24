@@ -51,6 +51,18 @@
               <span class="info-label">Duration</span>
               <span class="info-value">{{ formatDuration(photo.duration) }}</span>
             </div>
+            <div v-if="photo.dateTaken" class="info-row">
+              <span class="info-label">Date Taken</span>
+              <span class="info-value">{{ formatDate(photo.dateTaken) }}</span>
+            </div>
+            <div v-if="photo.fileBirthtime" class="info-row">
+              <span class="info-label">File Created</span>
+              <span class="info-value">{{ formatDate(photo.fileBirthtime) }}</span>
+            </div>
+            <div v-if="photo.fileMtime" class="info-row">
+              <span class="info-label">File Modified</span>
+              <span class="info-value">{{ formatDate(photo.fileMtime) }}</span>
+            </div>
             <div class="info-row">
               <span class="info-label">Status</span>
               <span class="info-value" :class="statusClass">{{ photo.status }}</span>
@@ -103,6 +115,9 @@ interface Photo {
   width?: number
   height?: number
   duration?: number
+  dateTaken?: string | null
+  fileBirthtime?: string | null
+  fileMtime?: string | null
   status: string
   metadata?: string
 }
@@ -146,6 +161,13 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function formatMetadata(metadata: string): string {

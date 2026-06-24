@@ -39,6 +39,7 @@ const i18n = createI18n({
       allTypes: '全部类型',
       photo: '图片',
       video: '视频',
+      photos: '张',
       allLoaded: '已加载全部'
     },
     'en': {
@@ -69,6 +70,7 @@ const i18n = createI18n({
       allTypes: 'All Types',
       photo: 'Photo',
       video: 'Video',
+      photos: 'items',
       allLoaded: 'All Loaded'
     }
   }

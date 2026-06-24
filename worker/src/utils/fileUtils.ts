@@ -4,26 +4,46 @@ import crypto from 'crypto'
 import ExifReader from 'exifreader'
 import { appLogger } from '@my-photo/shared'
 
-const HASH_SAMPLE_SIZE = 64 * 1024
 const EXIF_READ_SIZE = 128 * 1024
+const SMALL_FILE_THRESHOLD = 5 * 1024 * 1024
+const LARGE_FILE_CHUNK_COUNT = 8
+const LARGE_FILE_CHUNK_SIZE = 16 * 1024
+
+function pickHashAlgorithm(): string {
+  const candidates = ['xxhash128', 'xxhash3', 'sha512-256', 'sha256']
+  for (const algo of candidates) {
+    try {
+      crypto.createHash(algo)
+      return algo
+    } catch {
+      continue
+    }
+  }
+  return 'sha256'
+}
+
+export const HASH_ALGORITHM = pickHashAlgorithm()
 
 export async function calculateFileHash(filePath: string): Promise<string> {
   const { size } = await fs.promises.stat(filePath)
 
-  const hash = crypto.createHash('sha256')
+  if (size <= SMALL_FILE_THRESHOLD) {
+    const buffer = await fs.promises.readFile(filePath)
+    return crypto.createHash(HASH_ALGORITHM).update(buffer).digest('hex')
+  }
+
+  const hash = crypto.createHash(HASH_ALGORITHM)
   hash.update(String(size))
 
   const fd = await fs.promises.open(filePath, 'r')
   try {
-    const head = Buffer.alloc(HASH_SAMPLE_SIZE)
-    const headResult = await fd.read(head, 0, HASH_SAMPLE_SIZE, 0)
-    hash.update(head.subarray(0, headResult.bytesRead))
-
-    if (size > HASH_SAMPLE_SIZE) {
-      const tail = Buffer.alloc(HASH_SAMPLE_SIZE)
-      const tailOffset = Math.max(HASH_SAMPLE_SIZE, size - HASH_SAMPLE_SIZE)
-      const tailResult = await fd.read(tail, 0, HASH_SAMPLE_SIZE, tailOffset)
-      hash.update(tail.subarray(0, tailResult.bytesRead))
+    const buf = Buffer.alloc(LARGE_FILE_CHUNK_SIZE)
+    for (let i = 0; i < LARGE_FILE_CHUNK_COUNT; i++) {
+      const offset = i === 0
+        ? 0
+        : Math.floor((i * size) / LARGE_FILE_CHUNK_COUNT)
+      const result = await fd.read(buf, 0, LARGE_FILE_CHUNK_SIZE, offset)
+      hash.update(buf.subarray(0, result.bytesRead))
     }
   } finally {
     await fd.close()

@@ -56,14 +56,25 @@ export async function getMediaList(req: Request, res: Response) {
     }
 
     const whereClause = and(...conditions)
+    const sortKey = sql`COALESCE(${media.effectiveTime}, ${media.createdAt})`
+    const groupLabel = sql`strftime('%Y年%m月%d日', ${sortKey})`
 
-    const [totalResult, items] = await Promise.all([
+    const [totalResult, groupResult, items] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(media).where(whereClause),
+      db
+        .select({
+          label: sql<string>`${groupLabel}`,
+          count: sql<number>`count(*)`,
+        })
+        .from(media)
+        .where(whereClause)
+        .groupBy(sql`${groupLabel}`)
+        .orderBy(sql`${groupLabel} DESC`),
       db
         .select()
         .from(media)
         .where(whereClause)
-        .orderBy(sql`${media.dateTaken} IS NULL, ${media.dateTaken} DESC, ${media.createdAt} DESC`)
+        .orderBy(sql`${sortKey} DESC`)
         .limit(limit)
         .offset(offset),
     ])
@@ -78,6 +89,7 @@ export async function getMediaList(req: Request, res: Response) {
         total,
         totalPages: Math.ceil(total / limit),
       },
+      groups: groupResult,
     })
   } catch (error) {
     log.exception('Failed to get media list', error instanceof Error ? error : undefined)

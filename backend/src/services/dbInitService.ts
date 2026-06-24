@@ -1,6 +1,6 @@
 import fs from 'fs'
 import { sql } from 'drizzle-orm'
-import { db, config, appLogger } from '@my-photo/shared'
+import { db, config, appLogger, media } from '@my-photo/shared'
 
 const log = appLogger
 
@@ -46,6 +46,9 @@ export async function ensureDatabaseReady(): Promise<void> {
       make TEXT,
       model TEXT,
       date_taken TEXT,
+      file_birthtime TEXT,
+      file_mtime TEXT,
+      effective_time TEXT,
       latitude REAL,
       longitude REAL,
       metadata TEXT,

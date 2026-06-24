@@ -13,6 +13,9 @@ export interface UpsertResult {
     make: string | null
     model: string | null
     dateTaken: string | null
+    fileBirthtime: string | null
+    fileMtime: string | null
+    effectiveTime: string | null
     latitude: number | null
     longitude: number | null
     metadata: string | null

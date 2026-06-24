@@ -16,6 +16,9 @@ export interface Media {
   make: string | null
   model: string | null
   dateTaken: string | null
+  fileBirthtime: string | null
+  fileMtime: string | null
+  effectiveTime: string | null
   latitude: number | null
   longitude: number | null
   metadata: string | null
@@ -25,8 +28,14 @@ export interface Media {
   updatedAt: string
 }
 
+export interface MediaGroup {
+  label: string
+  count: number
+}
+
 interface MediaResponse {
   data: Media[]
+  groups: MediaGroup[]
   pagination: {
     page: number
     limit: number
@@ -37,6 +46,7 @@ interface MediaResponse {
 
 export const useMediaStore = defineStore('media', () => {
   const mediaList = ref<Media[]>([])
+  const mediaGroups = ref<MediaGroup[]>([])
   const loading = ref(false)
   const loadingMore = ref(false)
   const searchQuery = ref('')
@@ -75,8 +85,12 @@ export const useMediaStore = defineStore('media', () => {
 
       if (page === 1) {
         mediaList.value = data.data
+        mediaGroups.value = data.groups || []
       } else {
         mediaList.value = [...mediaList.value, ...data.data]
+        if (data.groups) {
+          mediaGroups.value = data.groups
+        }
       }
 
       currentPage.value = data.pagination.page
@@ -97,6 +111,7 @@ export const useMediaStore = defineStore('media', () => {
 
   const resetAndLoad = async () => {
     mediaList.value = []
+    mediaGroups.value = []
     currentPage.value = 1
     totalPages.value = 1
     await loadMedia(1, searchQuery.value || undefined)
@@ -157,6 +172,7 @@ export const useMediaStore = defineStore('media', () => {
 
   return {
     mediaList,
+    mediaGroups,
     loading,
     loadingMore,
     searchQuery,

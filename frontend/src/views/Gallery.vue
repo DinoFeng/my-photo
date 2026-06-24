@@ -33,36 +33,63 @@
     </div>
 
     <div v-else ref="scrollContainer" class="waterfall-wrapper">
-      <div v-for="group in groupedMedia" :key="group.label" class="date-group">
+      <div
+        v-for="group in mediaStore.mediaGroups"
+        :key="group.label"
+        class="date-group"
+        :style="{ minHeight: `${getGroupMinHeight(group.count)}px` }"
+      >
         <div class="date-header">
-          <span class="date-label">{{ group.label }}</span>
-          <span class="date-count">{{ group.items.length }}</span>
-        </div>
-
-        <div class="waterfall">
-          <div
-            v-for="item in group.items"
-            :key="item.id"
-            class="waterfall-card"
-            @click="openDetail(item)"
-          >
-            <div class="card-image">
-              <img
-                :src="getThumbnailUrl(item.id, item.fileType)"
-                :alt="item.filename"
-                loading="lazy"
-                @error="onImageError"
-              />
-              <div v-if="item.fileType === 'video'" class="video-badge">
-                <Play :size="16" />
-              </div>
-            </div>
-            <div class="card-info">
-              <span class="card-name">{{ item.filename }}</span>
-              <span v-if="item.dateTaken" class="card-date">{{ formatDate(item.dateTaken) }}</span>
-            </div>
+          <div class="timeline-marker">
+            <div
+              class="timeline-dot"
+              :style="{
+                width: `${getDotSize(group.count)}px`,
+                height: `${getDotSize(group.count)}px`,
+              }"
+            ></div>
+            <div class="timeline-line" :style="{ minHeight: `${getLineHeight(group.count)}px` }"></div>
+          </div>
+          <div v-if="groupedMediaMap.has(group.label)" class="date-card">
+            <Calendar :size="16" class="date-icon" />
+            <span class="date-label">{{ group.label }}</span>
+            <span class="date-count">{{ group.count }} {{ t('photos') }}</span>
           </div>
         </div>
+
+        <template v-if="groupedMediaMap.has(group.label)">
+          <div
+            v-for="sub in groupedMediaMap.get(group.label)!.subGroups"
+            :key="sub.label"
+            class="sub-group"
+          >
+            <div class="sub-header">{{ sub.label }}</div>
+            <div class="waterfall">
+              <div
+                v-for="item in sub.items"
+                :key="item.id"
+                class="waterfall-card"
+                @click="openDetail(item)"
+              >
+                <div class="card-image">
+                  <img
+                    :src="getThumbnailUrl(item.id, item.fileType)"
+                    :alt="item.filename"
+                    loading="lazy"
+                    @error="onImageError"
+                  />
+                  <div v-if="item.fileType === 'video'" class="video-badge">
+                    <Play :size="16" />
+                  </div>
+                </div>
+                <div class="card-info">
+                  <span class="card-name">{{ item.filename }}</span>
+                  <span class="card-date">{{ formatDate(item.effectiveTime || item.createdAt) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <div v-if="mediaStore.loadingMore" class="loading-more">
@@ -80,7 +107,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useInfiniteScroll } from '@vueuse/core'
-import { Search, Image, Play } from 'lucide-vue-next'
+import { Search, Image, Play, Calendar } from 'lucide-vue-next'
 import { NSpin as Spinner } from 'naive-ui'
 import { useMediaStore, type Media } from '../stores/mediaStore'
 
@@ -104,29 +131,80 @@ async function testApi() {
   }
 }
 
-interface MediaGroup {
+interface MediaSubGroup {
   label: string
   items: Media[]
 }
 
-const groupedMedia = computed<MediaGroup[]>(() => {
-  const groups = new Map<string, Media[]>()
+interface MediaGroup {
+  label: string
+  count: number
+  subGroups: MediaSubGroup[]
+}
 
+const groupedMedia = computed<MediaGroup[]>(() => {
+  const groupOrder = new Map<string, number>()
+  const groupCount = new Map<string, number>()
+  mediaStore.mediaGroups.forEach((g, i) => {
+    groupOrder.set(g.label, i)
+    groupCount.set(g.label, g.count)
+  })
+
+  const dayMap = new Map<string, Map<string, Media[]>>()
   for (const item of mediaStore.mediaList) {
-    const date = item.dateTaken || item.createdAt
-    const label = formatGroupLabel(date)
-    if (!groups.has(label)) {
-      groups.set(label, [])
-    }
-    groups.get(label)!.push(item)
+    const itemDate = item.effectiveTime || item.createdAt
+    const d = new Date(itemDate)
+    const itemKey = `${d.getUTCFullYear()}年${String(d.getUTCMonth() + 1).padStart(2, '0')}月${String(d.getUTCDate()).padStart(2, '0')}日`
+    const subKey = item.sourcePath || '其他'
+    if (!dayMap.has(itemKey)) dayMap.set(itemKey, new Map())
+    const subMap = dayMap.get(itemKey)!
+    if (!subMap.has(subKey)) subMap.set(subKey, [])
+    subMap.get(subKey)!.push(item)
   }
 
-  return Array.from(groups.entries()).map(([label, items]) => ({ label, items }))
+  const result = Array.from(dayMap.entries())
+    .sort((a, b) => {
+      return (groupOrder.get(a[0]) ?? 999999) - (groupOrder.get(b[0]) ?? 999999)
+    })
+    .map(([label, subMap]) => ({
+      label,
+      count: groupCount.get(label) ?? 0,
+      subGroups: Array.from(subMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([subLabel, items]) => ({ label: subLabel, items })),
+    }))
+  return result
 })
 
-function formatGroupLabel(dateStr: string): string {
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月`
+const groupedMediaMap = computed(() => {
+  const map = new Map<string, { subGroups: MediaSubGroup[]; count: number }>()
+  for (const g of groupedMedia.value) {
+    if (g.subGroups.length > 0) {
+      map.set(g.label, { subGroups: g.subGroups, count: g.count })
+    }
+  }
+  return map
+})
+
+const maxCount = computed(() => {
+  let max = 0
+  for (const g of mediaStore.mediaGroups) {
+    if (g.count > max) max = g.count
+  }
+  return max || 1
+})
+
+function getDotSize(count: number): number {
+  const ratio = count / maxCount.value
+  return 8 + Math.round(ratio * 22)
+}
+function getLineHeight(count: number): number {
+  const ratio = count / maxCount.value
+  return 20 + Math.round(ratio * 80)
+}
+function getGroupMinHeight(count: number): number {
+  const ratio = count / maxCount.value
+  return 60 + Math.round(ratio * 80)
 }
 
 function formatDate(dateStr: string): string {
@@ -258,31 +336,96 @@ onUnmounted(() => {
 }
 
 .date-group {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  position: relative;
+}
+
+.sub-group {
+  margin-left: 32px;
+  margin-bottom: 24px;
+  padding-left: 20px;
+  border-left: 2px dashed rgba(137, 180, 250, 0.2);
+}
+
+.sub-header {
+  font-size: 13px;
+  color: #a6adc8;
+  margin-bottom: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  letter-spacing: 0.5px;
 }
 
 .date-header {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 0 4px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 4px 0;
+}
+
+.timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+.timeline-dot {
+  border-radius: 50%;
+  background: linear-gradient(135deg, #89b4fa, #cba6f7);
+  border: 2px solid #1e1e2e;
+  box-shadow: 0 0 0 2px #89b4fa, 0 0 12px rgba(137, 180, 250, 0.6);
+  flex-shrink: 0;
+  transition: width 0.2s, height 0.2s;
+}
+
+.timeline-line {
+  width: 2px;
+  background: linear-gradient(to bottom, #89b4fa, rgba(137, 180, 250, 0.15));
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.date-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(137, 180, 250, 0.08), rgba(203, 166, 247, 0.04));
+  border: 1px solid rgba(137, 180, 250, 0.2);
+  border-left: 3px solid #89b4fa;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-left: 8px;
+}
+
+.date-icon {
+  color: #89b4fa;
+  flex-shrink: 0;
 }
 
 .date-label {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: #cdd6f4;
+  letter-spacing: 0.5px;
 }
 
 .date-count {
-  font-size: 12px;
-  color: #585b70;
+  font-size: 13px;
+  color: #a6adc8;
+  background: rgba(137, 180, 250, 0.15);
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-left: auto;
+  font-weight: 500;
 }
 
 .waterfall {
   column-count: 4;
   column-gap: 12px;
+  margin-left: 32px;
 }
 
 .waterfall-card {
@@ -292,11 +435,13 @@ onUnmounted(() => {
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid rgba(49, 50, 68, 0.6);
 }
 
 .waterfall-card:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(137, 180, 250, 0.3);
 }
 
 .card-image {
@@ -346,10 +491,22 @@ onUnmounted(() => {
 }
 
 .card-date {
-  display: block;
-  color: #585b70;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #74c7ec;
   font-size: 11px;
-  margin-top: 4px;
+  margin-top: 6px;
+  opacity: 0.9;
+}
+
+.card-date::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #74c7ec;
+  border-radius: 50%;
+  opacity: 0.6;
 }
 
 .loading-more {

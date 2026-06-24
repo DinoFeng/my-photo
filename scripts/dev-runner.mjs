@@ -32,8 +32,7 @@ const RESET = '\x1b[0m'
 const running = new Map()
 
 function prefix(name, color) {
-  const time = new Date().toISOString().substring(11, 19)
-  return `${color}[${time}] [${name}]${RESET} `
+  return `${color}[${name}]${RESET} `
 }
 
 function waitForPort(port, timeoutMs = 60000) {

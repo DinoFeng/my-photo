@@ -22,6 +22,9 @@ interface MediaData {
   make: string | null
   model: string | null
   dateTaken: string | null
+  fileBirthtime: string | null
+  fileMtime: string | null
+  effectiveTime: string
   latitude: number | null
   longitude: number | null
   metadata: string | null
@@ -36,6 +39,23 @@ function buildMediaData(
   filename: string,
   now: string,
 ): MediaData {
+  let dateTaken: string | null = null
+  if (metadata.dateTaken && !isNaN(metadata.dateTaken.getTime())) {
+    dateTaken = metadata.dateTaken.toISOString()
+  }
+
+  let fileBirthtime: string | null = null
+  if (stat.birthtime && !isNaN(stat.birthtime.getTime())) {
+    fileBirthtime = stat.birthtime.toISOString()
+  }
+
+  let fileMtime: string | null = null
+  if (stat.mtime && !isNaN(stat.mtime.getTime())) {
+    fileMtime = stat.mtime.toISOString()
+  }
+
+  const effectiveTime = dateTaken ?? fileBirthtime ?? fileMtime ?? now
+
   return {
     filename,
     fileSize: stat.size,
@@ -46,7 +66,10 @@ function buildMediaData(
     duration: metadata.duration ?? null,
     make: metadata.make ?? null,
     model: metadata.model ?? null,
-    dateTaken: metadata.dateTaken && !isNaN(metadata.dateTaken.getTime()) ? metadata.dateTaken.toISOString() : null,
+    dateTaken,
+    fileBirthtime,
+    fileMtime,
+    effectiveTime,
     latitude: metadata.latitude ?? null,
     longitude: metadata.longitude ?? null,
     metadata: metadata.metadata ? JSON.stringify(metadata.metadata) : null,
@@ -82,51 +105,57 @@ async function upsertMedia(
       make: record.make,
       model: record.model,
       dateTaken: record.dateTaken,
-      latitude: record.latitude,
-      longitude: record.longitude,
-      metadata: record.metadata,
-      thumbnailPath: record.thumbnailPath,
-      status: record.status ?? 'active',
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    }
+    fileBirthtime: record.fileBirthtime,
+    fileMtime: record.fileMtime,
+    effectiveTime: record.effectiveTime,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    metadata: record.metadata,
+    thumbnailPath: record.thumbnailPath,
+    status: record.status ?? 'active',
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
   }
+}
 
-  const id = uuidv4()
-  const now = data.updatedAt
+const id = uuidv4()
+const now = data.updatedAt
 
-  await db.insert(media).values({
-    id,
-    sourcePath,
-    filepath,
-    status: 'active',
-    createdAt: now,
-    ...data,
-  })
+await db.insert(media).values({
+  id,
+  sourcePath,
+  filepath,
+  status: 'active',
+  createdAt: now,
+  ...data,
+})
 
-  return {
-    action: 'insert',
-    id,
-    sourcePath,
-    filename: data.filename,
-    filepath,
-    fileSize: data.fileSize,
-    fileType: data.fileType,
-    hash: data.hash,
-    width: data.width,
-    height: data.height,
-    duration: data.duration,
-    make: data.make,
-    model: data.model,
-    dateTaken: data.dateTaken,
-    latitude: data.latitude,
-    longitude: data.longitude,
-    metadata: data.metadata,
-    thumbnailPath: null,
-    status: 'active',
-    createdAt: now,
-    updatedAt: now,
-  }
+return {
+  action: 'insert',
+  id,
+  sourcePath,
+  filename: data.filename,
+  filepath,
+  fileSize: data.fileSize,
+  fileType: data.fileType,
+  hash: data.hash,
+  width: data.width,
+  height: data.height,
+  duration: data.duration,
+  make: data.make,
+  model: data.model,
+  dateTaken: data.dateTaken,
+  fileBirthtime: data.fileBirthtime,
+  fileMtime: data.fileMtime,
+  effectiveTime: data.effectiveTime,
+  latitude: data.latitude,
+  longitude: data.longitude,
+  metadata: data.metadata,
+  thumbnailPath: null,
+  status: 'active',
+  createdAt: now,
+  updatedAt: now,
+}
 }
 
 export async function processReadFile(
