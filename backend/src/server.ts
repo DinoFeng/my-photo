@@ -1,5 +1,6 @@
 import express, { Express } from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -8,8 +9,10 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 
 import apiRoutes from './routes/api/index'
 import sseRoutes from './routes/sse/index'
+import shareRoutes from './routes/shareRoutes'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
+import { parseUserSession } from './middleware/authMiddleware'
 import { appLogger } from '@my-photo/shared'
 import { ensureDatabaseReady } from './services/dbInitService'
 import { monitorService, broadcastTask } from './instances/sse'
@@ -24,12 +27,18 @@ const HOST = process.env.HOST || '0.0.0.0'
 const WS_HUB_URL = process.env.WS_HUB_URL || 'ws://localhost:3001'
 
 app.use(accessLoggerMiddleware)
-app.use(cors())
+app.use(cors({
+  credentials: true,
+  origin: true,
+}))
 app.use(express.json())
+app.use(cookieParser())
+app.use(parseUserSession)
 app.use(express.static('public'))
 
 app.use('/sse', sseRoutes)
 app.use('/api', apiRoutes)
+app.use('/share', shareRoutes)
 
 app.use(notFoundHandler)
 app.use(errorLogger)

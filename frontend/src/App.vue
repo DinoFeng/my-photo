@@ -1,5 +1,8 @@
 <template>
-  <div class="app-layout">
+  <div v-if="isSharePage" class="share-root">
+    <router-view />
+  </div>
+  <div v-else class="app-layout">
     <aside class="sidebar">
       <div class="logo">
         <Image class="icon" :size="24" />
@@ -10,26 +13,57 @@
           <LayoutGrid :size="20" />
           <span>{{ t('gallery') }}</span>
         </router-link>
+        <router-link to="/albums" class="nav-item" :class="{ active: $route.name === 'albums' || $route.name === 'album-detail' }">
+          <Images :size="20" />
+          <span>相册</span>
+        </router-link>
         <router-link to="/settings" class="nav-item" :class="{ active: $route.name === 'settings' }">
           <Settings :size="20" />
           <span>{{ t('settings') }}</span>
         </router-link>
+        <router-link v-if="currentUser?.isAdmin" to="/settings/users" class="nav-item" :class="{ active: $route.name === 'user-admin' }">
+          <Users :size="20" />
+          <span>用户管理</span>
+        </router-link>
       </nav>
+
+      <div v-if="currentUser" class="user-section">
+        <div class="user-card">
+          <div class="user-avatar">{{ currentUser.avatarEmoji }}</div>
+          <div class="user-name">{{ currentUser.displayName }}</div>
+          <button class="logout-btn" @click="doLogout">退出</button>
+        </div>
+      </div>
     </aside>
     <main class="main-content">
       <router-view />
     </main>
+    <RecentScanThumbnails />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { onMounted, onUnmounted } from 'vue'
-import { Image, LayoutGrid, Settings } from 'lucide-vue-next'
+import { onMounted, onUnmounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Image, LayoutGrid, Settings, Images, Users } from 'lucide-vue-next'
 import { useMonitorStore } from './stores/monitorStore'
+import RecentScanThumbnails from './components/RecentScanThumbnails.vue'
+import { useAuthStore } from './stores/auth'
 
 const { t } = useI18n()
 const monitorStore = useMonitorStore()
+const authStore = useAuthStore()
+const router = useRouter()
+const route = useRoute()
+
+const currentUser = computed(() => authStore.user)
+const isSharePage = computed(() => route.name === 'share-viewer')
+
+async function doLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
 
 onMounted(() => {
   monitorStore.connect()
@@ -51,13 +85,17 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
+.share-root {
+  min-height: 100vh;
+}
+
 .app-layout {
   display: flex;
   height: 100vh;
 }
 
 .sidebar {
-  width: 200px;
+  width: 220px;
   background: #1e1e2e;
   color: #cdd6f4;
   display: flex;
@@ -69,7 +107,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   margin-bottom: 24px;
   padding: 8px;
@@ -83,6 +121,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
 }
 
 .nav-item {
@@ -94,6 +133,7 @@ body {
   color: #cdd6f4;
   text-decoration: none;
   transition: background 0.2s;
+  font-size: 14px;
 }
 
 .nav-item:hover {
@@ -103,6 +143,46 @@ body {
 .nav-item.active {
   background: rgba(137, 180, 250, 0.2);
   color: #89b4fa;
+}
+
+.user-section {
+  border-top: 1px solid #313244;
+  padding-top: 16px;
+}
+
+.user-card {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.user-avatar {
+  font-size: 24px;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.user-name {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background: #45475a;
+  color: #cdd6f4;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background: #585b70;
 }
 
 .main-content {

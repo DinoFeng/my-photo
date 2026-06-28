@@ -6,6 +6,7 @@ import App from './App.vue'
 import routes from './routes'
 import { setupErrorHandler } from './utils/errorHandler'
 import './styles/responsive.css'
+import { useAuthStore } from './stores/auth'
 
 const i18n = createI18n({
   legacy: false,
@@ -79,6 +80,52 @@ const i18n = createI18n({
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 路由守卫 - 认证检查
+router.beforeEach(async (to, _from, next) => {
+  const authStore = useAuthStore()
+
+  // 公开访问的页面
+  if (to.meta.noAuth) {
+    next()
+    return
+  }
+
+  // 还没加载用户信息时，先加载
+  if (!authStore.user && !authStore.loading) {
+    try {
+      const hasUsers = await authStore.checkSystemStatus()
+      // 还没初始化，跳转到登录页（初始化向导）
+      if (!hasUsers) {
+        next('/login')
+        return
+      }
+      const user = await authStore.fetchCurrentUser()
+      if (!user) {
+        next('/login')
+        return
+      }
+    } catch {
+      // 出错时让用户去登录页
+      next('/login')
+      return
+    }
+  }
+
+  // 需要认证但没登录
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    next('/login')
+    return
+  }
+
+  // 需要管理员权限
+  if (to.meta.requiresAdmin && !authStore.user?.isAdmin) {
+    next('/')
+    return
+  }
+
+  next()
 })
 
 const app = createApp(App)

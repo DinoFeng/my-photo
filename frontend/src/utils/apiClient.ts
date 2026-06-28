@@ -1,9 +1,8 @@
-const AUTH_HEADER = 'Basic ' + btoa('admin:password')
-
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: unknown
   headers?: Record<string, string>
+  noAuth?: boolean
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -11,8 +10,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   const config: RequestInit = {
     method,
+    credentials: 'include',
     headers: {
-      'Authorization': AUTH_HEADER,
       'Content-Type': 'application/json',
       ...headers
     }
@@ -25,7 +24,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const response = await fetch(`/api${endpoint}`, config)
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`)
+    let errorMessage = `请求失败: ${response.status}`
+    try {
+      const data = await response.json()
+      if (data.error) errorMessage = data.error
+    } catch {
+      // 忽略
+    }
+    throw new Error(errorMessage)
   }
 
   const contentType = response.headers.get('content-type')
@@ -50,6 +56,134 @@ export const apiClient = {
     request<T>(endpoint, { ...options, method: 'DELETE' })
 }
 
+// === 相册功能新增：认证 API ===
+export interface AuthUser {
+  id: string
+  displayName: string
+  avatarEmoji: string
+  isAdmin: boolean
+  status: string
+  mustChangePassword?: boolean
+}
+
+export const authApi = {
+  getStatus: () => apiClient.get<{ hasAdmin: boolean }>('/auth/status'),
+  getCurrentUser: () => apiClient.get<{ user: AuthUser | null }>('/auth/me'),
+  login: (data: { username: string; password: string }) =>
+    apiClient.post<{ user: AuthUser }>('/auth/login', data),
+  loginWithCode: (data: { inviteCode: string }) =>
+    apiClient.post<{ user: AuthUser }>('/auth/login-with-code', data),
+  changePassword: (data: { newPassword: string; oldPassword?: string }) =>
+    apiClient.post<{ user: AuthUser }>('/auth/change-password', data),
+  logout: () => apiClient.post<{ ok: boolean }>('/auth/logout'),
+}
+
+// === 相册功能新增：用户管理 API ===
+export interface UserData {
+  id: string
+  username: string | null
+  displayName: string
+  avatarEmoji: string
+  isAdmin: boolean
+  status: string
+  inviteCode: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const userApi = {
+  getAll: () => apiClient.get<{ users: UserData[] }>('/users'),
+  create: (data: { displayName: string; avatarEmoji: string }) =>
+    apiClient.post<{ user: UserData }>('/users', data),
+  update: (id: string, data: { displayName?: string; avatarEmoji?: string; status?: string; regenerateInviteCode?: boolean }) =>
+    apiClient.put<{ user: UserData }>(`/users/${id}`, data),
+  remove: (id: string) => apiClient.delete<{ ok: boolean }>(`/users/${id}`),
+}
+
+// === 相册功能新增：相册 API ===
+export interface AlbumData {
+  id: string
+  ownerId: string
+  ownerName: string
+  name: string
+  description: string | null
+  coverMediaId: string | null
+  visibility: 'private' | 'all_users'
+  mediaCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AlbumShareData {
+  id: string
+  albumId: string
+  shareToken: string
+  createdBy: string
+  createdAt: string
+  expiresAt: string | null
+}
+
+export const albumApi = {
+  getList: (filter?: { owner?: 'me' | 'others' }) => {
+    const params = new URLSearchParams()
+    if (filter?.owner) params.set('owner', filter.owner)
+    const query = params.toString()
+    return apiClient.get<{ albums: AlbumData[] }>(`/albums${query ? `?${query}` : ''}`)
+  },
+  getDetail: (id: string) => apiClient.get<{ album: AlbumData }>(`/albums/${id}`),
+  create: (data: { name: string; description?: string; visibility?: 'private' | 'all_users' }) =>
+    apiClient.post<{ album: AlbumData }>('/albums', data),
+  update: (id: string, data: { name?: string; description?: string; visibility?: 'private' | 'all_users'; coverMediaId?: string }) =>
+    apiClient.put<{ album: AlbumData }>(`/albums/${id}`, data),
+  remove: (id: string) => apiClient.delete<{ ok: boolean }>(`/albums/${id}`),
+
+  getMedia: (id: string, page = 1, limit = 30) =>
+    apiClient.get<{ data: any[]; pagination: any }>(`/albums/${id}/media?page=${page}&limit=${limit}`),
+  addMedia: (id: string, mediaIds: string[]) =>
+    apiClient.post<{ added: number; skipped: number }>(`/albums/${id}/media`, { mediaIds }),
+  removeMedia: (albumId: string, mediaId: string) =>
+    apiClient.delete<{ ok: boolean }>(`/albums/${albumId}/media/${mediaId}`),
+  batchRemoveMedia: (albumId: string, mediaIds: string[]) =>
+    apiClient.post<{ removed: number }>(`/albums/${albumId}/media/batch-remove`, { mediaIds }),
+
+  getShares: (id: string) => apiClient.get<{ shares: AlbumShareData[] }>(`/albums/${id}/shares`),
+  createShare: (id: string) => apiClient.post<{ share: AlbumShareData }>(`/albums/${id}/shares`),
+  removeShare: (albumId: string, shareId: string) =>
+    apiClient.delete<{ ok: boolean }>(`/albums/${albumId}/shares/${shareId}`),
+}
+
+// === 相册功能新增：公开分享 API ===
+export const shareApi = {
+  getAlbum: (token: string) => apiClient.get<{ album: any; ownerName: string }>(`/auth/shares/album/${token}`),
+}
+
+// 公开分享需要调用根级别 /share/api/... 路由，不走 /api
+export async function shareApiGet<T>(endpoint: string): Promise<T> {
+  const response = await fetch(`/share/api/${endpoint}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    let errorMessage = `请求失败: ${response.status}`
+    try {
+      const data = await response.json()
+      if (data.error) errorMessage = data.error
+    } catch {
+      // 忽略
+    }
+    throw new Error(errorMessage)
+  }
+  return response.json()
+}
+
+export const publicShareApi = {
+  getAlbum: (token: string) => shareApiGet<{ album: any; ownerName: string }>(`album/${token}`),
+  getMedia: (token: string, page = 1, limit = 30) =>
+    shareApiGet<{ data: any[]; pagination: any }>(`album/${token}/media?page=${page}&limit=${limit}`),
+}
+
+// === 原有 SSE ===
 interface SSEEventHandlers<T = any> {
   [eventName: string]: (data: T) => void;
 }
@@ -60,8 +194,8 @@ export async function sseRequest(
   abortSignal: AbortSignal
 ): Promise<void> {
   const response = await fetch(`/sse${endpoint}`, {
+    credentials: 'include',
     headers: {
-      'Authorization': AUTH_HEADER,
       'Accept': 'text/event-stream'
     },
     signal: abortSignal

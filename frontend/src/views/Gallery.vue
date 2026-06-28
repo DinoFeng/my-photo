@@ -22,89 +22,115 @@
       </div>
     </div>
 
-    <div v-if="mediaStore.loading && mediaStore.mediaList.length === 0" class="loading">
-      <Spinner :size="32" />
-      <span>{{ t('loading') }}</span>
-    </div>
+    <!-- 滚动容器始终存在（ref 稳定），内容用 v-show 控制可见性 -->
+    <div ref="scrollContainer" class="waterfall-wrapper">
+      <div v-if="mediaStore.loading && mediaStore.mediaList.length === 0" class="loading">
+        <Spinner :size="32" />
+        <span>{{ t('loading') }}</span>
+      </div>
 
-    <div v-else-if="groupedMedia.length === 0" class="empty-state">
-      <Image :size="48" />
-      <p>{{ t('noResults') }}</p>
-    </div>
+      <div v-else-if="groupedMedia.length === 0" class="empty-state">
+        <Image :size="48" />
+        <p>{{ t('noResults') }}</p>
+      </div>
 
-    <div v-else ref="scrollContainer" class="waterfall-wrapper">
-      <div
-        v-for="group in mediaStore.mediaGroups"
-        :key="group.label"
-        class="date-group"
-        :style="{ minHeight: `${getGroupMinHeight(group.count)}px` }"
-      >
-        <div class="date-header">
-          <div class="timeline-marker">
+      <template v-else>
+        <aside class="timeline-column">
+          <div
+            v-for="group in mediaStore.mediaGroups"
+            :key="'tl-' + group.label"
+            class="timeline-item"
+            :style="{ minHeight: `${getGroupMinHeight(group.count) + 40}px` }"
+            :title="group.label"
+            @click="scrollToGroup(group.label)"
+          >
             <div
               class="timeline-dot"
+              :class="{
+                'timeline-dot--empty': group.label !== mediaStore.activeDate,
+                'timeline-dot--active': group.label === mediaStore.activeDate,
+              }"
               :style="{
                 width: `${getDotSize(group.count)}px`,
                 height: `${getDotSize(group.count)}px`,
               }"
             ></div>
-            <div class="timeline-line" :style="{ minHeight: `${getLineHeight(group.count)}px` }"></div>
           </div>
-          <div v-if="groupedMediaMap.has(group.label)" class="date-card">
-            <Calendar :size="16" class="date-icon" />
-            <span class="date-label">{{ group.label }}</span>
-            <span class="date-count">{{ group.count }} {{ t('photos') }}</span>
-          </div>
-        </div>
+        </aside>
 
-        <template v-if="groupedMediaMap.has(group.label)">
+        <div class="gallery-content">
+          <!-- 顶部区域：锚点模式时显示加载状态 -->
+          <div v-if="mediaStore.loadingNewer" class="loading-more loading-more--top">
+            <Spinner :size="24" />
+            <span>加载更近期的图片...</span>
+          </div>
+          <div v-else-if="!mediaStore.hasMoreNewer && mediaStore.anchorDateIso" class="end-marker end-marker--top">
+            已到最新日期
+          </div>
+
+          <!-- 只渲染实际有图片的日期分组（groupedMedia 按 DESC 排序） -->
           <div
-            v-for="sub in groupedMediaMap.get(group.label)!.subGroups"
-            :key="sub.label"
-            class="sub-group"
+            v-for="group in groupedMedia"
+            :key="group.label"
+            :id="'group-' + group.label"
+            class="date-group"
           >
-            <div class="sub-header">{{ sub.label }}</div>
-            <div class="waterfall">
-              <div
-                v-for="item in sub.items"
-                :key="item.id"
-                class="waterfall-card"
-                @click="openDetail(item)"
-              >
-                <div class="card-image">
-                  <img
-                    :src="getThumbnailUrl(item.id, item.fileType)"
-                    :alt="item.filename"
-                    loading="lazy"
-                    @error="onImageError"
-                  />
-                  <div v-if="item.fileType === 'video'" class="video-badge">
-                    <Play :size="16" />
+            <div class="date-header">
+              <div class="date-card">
+                <Calendar :size="16" class="date-icon" />
+                <span class="date-label">{{ group.label }}</span>
+                <span class="date-count">{{ group.count }} {{ t('photos') }}</span>
+              </div>
+            </div>
+
+            <div
+              v-for="sub in group.subGroups"
+              :key="sub.label"
+              class="sub-group"
+            >
+              <div class="sub-header">{{ sub.label }}</div>
+              <div class="waterfall">
+                <div
+                  v-for="item in sub.items"
+                  :key="item.id"
+                  class="waterfall-card"
+                  @click="openDetail(item)"
+                >
+                  <div class="card-image">
+                    <img
+                      :src="getThumbnailUrl(item.id, item.fileType)"
+                      :alt="item.filename"
+                      loading="lazy"
+                      @error="onImageError"
+                    />
+                    <div v-if="item.fileType === 'video'" class="video-badge">
+                      <Play :size="16" />
+                    </div>
                   </div>
-                </div>
-                <div class="card-info">
-                  <span class="card-name">{{ item.filename }}</span>
-                  <span class="card-date">{{ formatDate(item.effectiveTime || item.createdAt) }}</span>
+                  <div class="card-info">
+                    <span class="card-name">{{ item.filename }}</span>
+                    <span class="card-date">{{ formatDate(item.effectiveTime || item.createdAt) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </template>
-      </div>
 
-      <div v-if="mediaStore.loadingMore" class="loading-more">
-        <Spinner :size="24" />
-      </div>
+          <div v-if="mediaStore.loadingMore" class="loading-more">
+            <Spinner :size="24" />
+          </div>
 
-      <div v-if="!mediaStore.hasMore && mediaStore.mediaList.length > 0" class="end-marker">
-        {{ t('allLoaded') }}
-      </div>
+          <div v-if="!hasMoreBottom && mediaStore.mediaList.length > 0" class="end-marker">
+            {{ t('allLoaded') }}
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useInfiniteScroll } from '@vueuse/core'
 import { Search, Image, Play, Calendar } from 'lucide-vue-next'
@@ -118,6 +144,14 @@ const localSearch = ref('')
 const scrollContainer = ref<HTMLElement | null>(null)
 const testResult = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+// 加载与跳转状态管理
+// isJumping: 锚点跳转期间，禁止所有滚动加载
+// topLoadingBusy: 向上滚加载时的锁，避免重复触发
+let isJumping = false
+let topLoadingBusy = false
+let lastPrependScrollHeight = 0
+let lastPrependScrollTop = 0
 
 async function testApi() {
   testResult.value = '...'
@@ -176,15 +210,7 @@ const groupedMedia = computed<MediaGroup[]>(() => {
   return result
 })
 
-const groupedMediaMap = computed(() => {
-  const map = new Map<string, { subGroups: MediaSubGroup[]; count: number }>()
-  for (const g of groupedMedia.value) {
-    if (g.subGroups.length > 0) {
-      map.set(g.label, { subGroups: g.subGroups, count: g.count })
-    }
-  }
-  return map
-})
+
 
 const maxCount = computed(() => {
   let max = 0
@@ -194,17 +220,12 @@ const maxCount = computed(() => {
   return max || 1
 })
 
-function getDotSize(count: number): number {
-  const ratio = count / maxCount.value
-  return 8 + Math.round(ratio * 22)
-}
-function getLineHeight(count: number): number {
-  const ratio = count / maxCount.value
-  return 20 + Math.round(ratio * 80)
+function getDotSize(_count: number): number {
+  return 16
 }
 function getGroupMinHeight(count: number): number {
   const ratio = count / maxCount.value
-  return 60 + Math.round(ratio * 80)
+  return 40 + Math.round(ratio * 100)
 }
 
 function formatDate(dateStr: string): string {
@@ -247,20 +268,277 @@ function getThumbnailUrl(id: string, fileType?: string | null): string {
 }
 
 function openDetail(item: Media) {
-  // TODO: 打开详情弹窗或跳转详情页
   console.log('Open detail:', item.id)
 }
 
+// ===== 核心滚动逻辑 =====
+
+// 自动预加载：当 scrollTop 为 0 时，用户无法向上滚动触发 loadNewer
+// 此函数在有更多更新数据时自动加载，确保用户始终有上滚空间
+function autoPreloadNewer() {
+  if (topLoadingBusy || mediaStore.loadingNewer || !mediaStore.hasMoreNewer) return
+  topLoadingBusy = true
+  const c = scrollContainer.value
+  lastPrependScrollTop = c?.scrollTop ?? 0
+  lastPrependScrollHeight = c?.scrollHeight ?? 0
+  mediaStore.loadNewer().then(() => {
+    nextTick(() => {
+      if (!scrollContainer.value) return
+      const cc = scrollContainer.value
+      const added = cc.scrollHeight - lastPrependScrollHeight
+      if (added > 0) {
+        cc.scrollTop = lastPrependScrollTop + added
+      }
+      setTimeout(() => { topLoadingBusy = false }, 300)
+    })
+  })
+}
+
+// 跳转到指定日期：只加载锚点及更旧的图片，然后滚动到目标位置
+// 关键：更新日期的图片留给用户向上滚动时加载，避免跳转期间内容被大幅改变
+function scrollToGroup(label: string) {
+  console.debug('[scrollToGroup] 开始', { label, activeDate: mediaStore.activeDate })
+
+  // 检查目标日期是否已在当前列表中，如果已加载就直接滚动定位，不重新加载
+  const dateAlreadyLoaded = groupedMedia.value.some((g) => g.label === label)
+  if (dateAlreadyLoaded) {
+    console.debug('[scrollToGroup] 日期已加载，直接滚动', { label })
+    const el = document.getElementById('group-' + label)
+    const container = scrollContainer.value
+    if (el && container) {
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      const offset = elRect.top - containerRect.top + container.scrollTop - 300
+      container.scrollTo({ top: Math.max(0, offset), behavior: 'instant' })
+      mediaStore.setActiveDate(label)
+      // 自动预加载更多更新数据，确保有上滚空间
+      if (mediaStore.hasMoreNewer && mediaStore.anchorDateIso) {
+        autoPreloadNewer()
+      }
+    }
+    return
+  }
+
+  // 新日期：需要重新加载
+  isJumping = true
+  mediaStore.jumpToDate(label).then((loadedLabel) => {
+    if (!loadedLabel) {
+      console.debug('[scrollToGroup] 未加载到数据', { label })
+      isJumping = false
+      return
+    }
+    // 等 Vue 渲染新列表后再滚动
+    nextTick(() => {
+      nextTick(() => {
+        const el = document.getElementById('group-' + loadedLabel)
+        const container = scrollContainer.value
+        if (!el || !container) {
+          console.debug('[scrollToGroup] 元素不存在', { hasEl: !!el, hasContainer: !!container })
+          isJumping = false
+          return
+        }
+        const containerRect = container.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        // 目标位置：目标日期距容器顶部 300px，留出足够的向上滚动空间
+        const offset = elRect.top - containerRect.top + container.scrollTop - 300
+        console.debug('[scrollToGroup] 滚动', {
+          label: loadedLabel,
+          scrollBefore: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          targetOffset: Math.max(0, offset),
+          mediaListLength: mediaStore.mediaList.length,
+          groupedDateCount: groupedMedia.value.length,
+        })
+        // 用 instant 而不是 smooth，避免滚动过程中触发多次加载
+        container.scrollTo({ top: Math.max(0, offset), behavior: 'instant' })
+
+        // 滚动完成后再延迟解锁，确保滚动稳定
+        setTimeout(() => {
+          isJumping = false
+          console.debug('[scrollToGroup] 解锁完成')
+          // 跳转后自动预加载更多更新数据，确保用户有足够的上滚空间
+          if (mediaStore.hasMoreNewer && mediaStore.anchorDateIso) {
+            autoPreloadNewer()
+          }
+        }, 200)
+      })
+    })
+  })
+}
+
+// 向下滚动到底部 → 加载更旧的图片
 useInfiniteScroll(
   scrollContainer,
   () => {
+    // 跳转期间禁止加载
+    if (isJumping) {
+      console.debug('[useInfiniteScroll] 跳转中，跳过')
+      return
+    }
+    console.debug('[useInfiniteScroll] 触发底部加载', {
+      anchorDateIso: mediaStore.anchorDateIso,
+      loadingMore: mediaStore.loadingMore,
+      hasMoreOlder: mediaStore.hasMoreOlder,
+    })
     mediaStore.loadMore()
   },
-  { distance: 200 },
+  { distance: 300 },
 )
 
+// 向上滚动 → 加载更新日期的图片（仅锚点模式）
+function onScrollTopLoad() {
+  const container = scrollContainer.value
+  if (!container) return
+
+  // 只有锚点模式才需要向上加载
+  if (!mediaStore.anchorDateIso) return
+
+  // 跳转期间禁止加载
+  if (isJumping) return
+
+  // 基本条件：不在加载中 & 还有更多 & 未在 busy 状态
+  if (mediaStore.loadingNewer || !mediaStore.hasMoreNewer || topLoadingBusy) return
+
+  // 关键条件：scrollTop 接近顶部就触发（200px 内都可以触发，降低触发门槛）
+  // 同时处理特殊情况：如果内容本身不够高（clientHeight >= scrollHeight），也触发
+  const notEnoughToScroll = container.scrollHeight - container.clientHeight < 200
+  if (container.scrollTop > 200 && !notEnoughToScroll) return
+
+  topLoadingBusy = true
+  lastPrependScrollTop = container.scrollTop
+  lastPrependScrollHeight = container.scrollHeight
+
+  console.debug('[onScrollTopLoad] 触发 loadNewer', {
+    scrollTop: container.scrollTop,
+    scrollHeight: container.scrollHeight,
+    clientHeight: container.clientHeight,
+    anchorDateIso: mediaStore.anchorDateIso,
+    newerPage: mediaStore.newerPage,
+    hasMoreNewer: mediaStore.hasMoreNewer,
+    mediaListLength: mediaStore.mediaList.length,
+    groupedDateCount: groupedMedia.value.length,
+  })
+
+  mediaStore.loadNewer().then(() => {
+    nextTick(() => {
+      if (!scrollContainer.value) return
+      const c = scrollContainer.value
+      const addedHeight = c.scrollHeight - lastPrependScrollHeight
+
+      // 核心修复：新图片被 prepend 到内容顶部（位置 0 ~ addedHeight 都是新内容）
+      // 用户当前 scrollTop 本来就在顶部附近（< 200px），不需要补偿！
+      // 现在 scrollTop 附近的内容自动就是新加载的图片了
+      //
+      // 只需要做一件事：把 scrollTop 轻轻推到 250px，刚好高于触发阈值（200px）
+      // 这样：
+      //   1. 用户看到的全是新图片（250 ~ 1050px 位置，都在 0~addedHeight 范围内）
+      //   2. scrollTop = 250 > 200，不会立即再次触发加载
+      //   3. 用户向上滚（scrollTop ↓）→ 经过 200 → 触发下一次加载
+      //
+      // 特殊情况：如果新加内容非常短（addedHeight < 300），则推到新加内容底部
+      if (addedHeight > 0) {
+        const target = Math.max(
+          Math.min(250, addedHeight - 50),  // 250 或新加内容底部-50（取小的）
+          50  // 至少 50，保证不会滚到顶部以下
+        )
+        c.scrollTop = target
+        console.debug('[onScrollTopLoad] 新内容已在顶部，轻轻推到', {
+          addedHeight,
+          targetScrollTop: target,
+          scrollTopNow: c.scrollTop,
+        })
+      } else if (notEnoughToScroll && c.scrollTop < c.clientHeight) {
+        // 内容不够高但刚加了一点内容：推到新加内容顶部偏下位置
+        c.scrollTop = 250
+      }
+      setTimeout(() => {
+        topLoadingBusy = false
+      }, 300)
+    })
+  })
+}
+
+// 滚动联动高亮：根据当前可见的日期分组，更新时间线圆点
+// 参考线：内容区顶部下 200px 位置，穿过这个位置的日期分组就是"正在看"的日期
+let lastSpyDate = ''
+function onScrollSpy() {
+  const container = scrollContainer.value
+  if (!container) return
+  if (isJumping) return // 跳转期间不更新，避免闪烁
+
+  const groups = container.querySelectorAll<HTMLDivElement>('.date-group')
+  if (groups.length === 0) return
+
+  // 用 getBoundingClientRect 获取可靠的相对位置
+  const containerRect = container.getBoundingClientRect()
+  const refY = containerRect.top + 200 // 参考线：容器顶部下200px
+
+  // 找到最后一个顶部位置 <= 参考线的日期分组
+  let currentLabel = ''
+  for (const g of groups) {
+    const rect = g.getBoundingClientRect()
+    if (rect.top <= refY) {
+      currentLabel = g.id.replace('group-', '')
+    } else {
+      break
+    }
+  }
+
+  if (currentLabel && currentLabel !== lastSpyDate) {
+    lastSpyDate = currentLabel
+    mediaStore.setActiveDate(currentLabel)
+  }
+}
+
+// 统一的 scroll 处理器：先 spy 更新高亮，再处理加载
+let scrollSpyThrottle = 0
+function onGalleryScroll() {
+  const now = Date.now()
+  if (now - scrollSpyThrottle > 100) {
+    onScrollSpy()
+    scrollSpyThrottle = now
+  }
+  onScrollTopLoad()
+}
+
+// 绑定 scroll 事件：用 watchEffect 确保 ref 变化时重新绑定
+let scrollHandlerAttached = false
+function setupScrollHandler() {
+  if (scrollHandlerAttached) return
+  if (!scrollContainer.value) return
+  scrollContainer.value.addEventListener('scroll', onGalleryScroll, { passive: true })
+  scrollHandlerAttached = true
+  console.debug('[Gallery] scrollHandler 绑定成功', {
+    scrollHeight: scrollContainer.value.scrollHeight,
+    clientHeight: scrollContainer.value.clientHeight,
+  })
+}
+
+watchEffect(() => {
+  // 只要 scrollContainer.value 存在就绑定
+  if (scrollContainer.value) {
+    setupScrollHandler()
+  }
+})
+
+// 当锚点日期变化时，重置 busy 状态（新的锚点可能重新有更新数据可加载）
+watch(
+  () => mediaStore.anchorDateIso,
+  () => {
+    topLoadingBusy = false
+    console.debug('[Gallery] anchorDateIso 变化，重置 busy 状态')
+  },
+)
+
+const hasMoreBottom = computed(() => {
+  if (mediaStore.anchorDateIso) return mediaStore.hasMoreOlder
+  return true
+})
+
 onMounted(async () => {
+  console.debug('[Gallery] onMounted')
   await mediaStore.resetAndLoad()
+  await nextTick()
   await mediaStore.connectMediaSSE()
 })
 
@@ -330,9 +608,88 @@ onUnmounted(() => {
 }
 
 .waterfall-wrapper {
+  position: relative;
   flex: 1;
+  display: flex;
+  gap: 16px;
   overflow-y: auto;
   padding: 0 24px 24px;
+}
+
+.waterfall-wrapper::before {
+  content: '';
+  position: absolute;
+  left: 54px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #89b4fa, rgba(137, 180, 250, 0.15));
+  pointer-events: none;
+}
+
+.timeline-column {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  width: 60px;
+  flex-shrink: 0;
+  padding-top: 16px;
+  z-index: 1;
+}
+
+.timeline-item {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  cursor: pointer;
+  padding-top: 8px;
+  transition: transform 0.15s ease;
+}
+
+.timeline-item:hover {
+  transform: scale(1.15);
+}
+
+.timeline-item:hover .timeline-dot {
+  box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.6), 0 0 16px rgba(137, 180, 250, 0.9);
+}
+
+.timeline-dot {
+  border-radius: 50%;
+  background: linear-gradient(135deg, #89b4fa, #cba6f7);
+  border: 2px solid #181825;
+  box-shadow: 0 0 0 2px #89b4fa, 0 0 12px rgba(137, 180, 250, 0.6);
+  flex-shrink: 0;
+  transition: width 0.2s, height 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.timeline-dot--empty {
+  opacity: 0.35;
+  background: #45475a;
+  border-color: #181825;
+  box-shadow: 0 0 0 2px #45475a;
+}
+
+.timeline-dot--active {
+  opacity: 1;
+  background: linear-gradient(135deg, #f9e2af, #fab387);
+  border-color: #181825;
+  box-shadow: 0 0 0 3px rgba(250, 179, 135, 0.8), 0 0 20px rgba(250, 179, 135, 0.7);
+  animation: timeline-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes timeline-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(250, 179, 135, 0.8), 0 0 20px rgba(250, 179, 135, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(250, 179, 135, 0.6), 0 0 28px rgba(250, 179, 135, 0.5);
+  }
+}
+
+.gallery-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .date-group {
@@ -341,7 +698,6 @@ onUnmounted(() => {
 }
 
 .sub-group {
-  margin-left: 32px;
   margin-bottom: 24px;
   padding-left: 20px;
   border-left: 2px dashed rgba(137, 180, 250, 0.2);
@@ -356,39 +712,11 @@ onUnmounted(() => {
 }
 
 .date-header {
-  display: flex;
-  align-items: flex-start;
   margin-bottom: 16px;
   padding: 4px 0;
 }
 
-.timeline-marker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 24px;
-  flex-shrink: 0;
-  padding-top: 8px;
-}
-
-.timeline-dot {
-  border-radius: 50%;
-  background: linear-gradient(135deg, #89b4fa, #cba6f7);
-  border: 2px solid #1e1e2e;
-  box-shadow: 0 0 0 2px #89b4fa, 0 0 12px rgba(137, 180, 250, 0.6);
-  flex-shrink: 0;
-  transition: width 0.2s, height 0.2s;
-}
-
-.timeline-line {
-  width: 2px;
-  background: linear-gradient(to bottom, #89b4fa, rgba(137, 180, 250, 0.15));
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-
 .date-card {
-  flex: 1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -397,7 +725,13 @@ onUnmounted(() => {
   border-left: 3px solid #89b4fa;
   padding: 12px 20px;
   border-radius: 8px;
-  margin-left: 8px;
+}
+
+.date-card--placeholder {
+  opacity: 0.35;
+  background: transparent;
+  border-color: rgba(137, 180, 250, 0.1);
+  border-left-color: rgba(137, 180, 250, 0.25);
 }
 
 .date-icon {
@@ -425,7 +759,6 @@ onUnmounted(() => {
 .waterfall {
   column-count: 4;
   column-gap: 12px;
-  margin-left: 32px;
 }
 
 .waterfall-card {
@@ -512,8 +845,17 @@ onUnmounted(() => {
 .loading-more {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 8px;
   padding: 16px;
   color: #a6adc8;
+  font-size: 13px;
+}
+
+.loading-more--top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  color: #89b4fa;
 }
 
 .end-marker {
@@ -521,6 +863,11 @@ onUnmounted(() => {
   padding: 24px;
   color: #585b70;
   font-size: 13px;
+}
+
+.end-marker--top {
+  padding: 8px;
+  color: #6c7086;
 }
 
 @media (max-width: 1200px) {
@@ -532,6 +879,12 @@ onUnmounted(() => {
 @media (max-width: 800px) {
   .waterfall {
     column-count: 2;
+  }
+  .timeline-column {
+    width: 44px;
+  }
+  .waterfall-wrapper::before {
+    left: 46px;
   }
 }
 

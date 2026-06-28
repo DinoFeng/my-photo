@@ -40,24 +40,49 @@ export async function getMediaList(req: Request, res: Response) {
     const search = (req.query.search as string) || ''
     const fileType = (req.query.fileType as string) || ''
     const sourcePath = (req.query.sourcePath as string) || ''
+    const beforeDateRaw = (req.query.beforeDate as string) || ''
+    const afterDateRaw = (req.query.afterDate as string) || ''
 
-    const conditions = [eq(media.status, 'active')]
-
-    if (search) {
-      conditions.push(like(media.filename, `%${search}%`))
-    }
-
-    if (fileType) {
-      conditions.push(eq(media.fileType, fileType))
-    }
-
-    if (sourcePath) {
-      conditions.push(eq(media.sourcePath, sourcePath))
-    }
-
-    const whereClause = and(...conditions)
     const sortKey = sql`COALESCE(${media.effectiveTime}, ${media.createdAt})`
     const groupLabel = sql`strftime('%Y年%m月%d日', ${sortKey})`
+
+    // beforeDate: <= 某日期（配合 DESC 排序，看更早的日期）
+    // afterDate: > 某日期（配合 ASC 排序，看更近期的日期，紧邻锚点）
+    // 数据库存储为 ISO 8601 格式（如 2020-08-27T12:34:56.789Z）
+    const conditions = [eq(media.status, 'active')]
+    if (search) conditions.push(like(media.filename, `%${search}%`))
+    if (fileType) conditions.push(eq(media.fileType, fileType))
+    if (sourcePath) conditions.push(eq(media.sourcePath, sourcePath))
+
+    let hasBeforeDate = false
+    let hasAfterDate = false
+    if (beforeDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(beforeDateRaw)) {
+      hasBeforeDate = true
+      conditions.push(sql`${sortKey} <= ${beforeDateRaw + 'T23:59:59.999Z'}`)
+    }
+    if (afterDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(afterDateRaw)) {
+      hasAfterDate = true
+      // 使用 T23:59:59.999Z 排除锚点日期当天的照片，确保只返回严格更新的日期
+      conditions.push(sql`${sortKey} > ${afterDateRaw + 'T23:59:59.999Z'}`)
+    }
+
+    // afterDate 模式：需要 ASC 排序才能取到"紧邻锚点"的更新数据
+    // （DESC 会直接跳到离锚点最远的最新数据）
+    // 返回前再反转数组，保证前端收到的始终是 DESC
+    const isAfterMode = hasAfterDate && !hasBeforeDate
+
+    const whereClause = and(...conditions)
+
+    // groups 始终返回全部分组（不受日期窗口影响）
+    const groupConditions = [eq(media.status, 'active')]
+    if (search) groupConditions.push(like(media.filename, `%${search}%`))
+    if (fileType) groupConditions.push(eq(media.fileType, fileType))
+    if (sourcePath) groupConditions.push(eq(media.sourcePath, sourcePath))
+    const groupWhereClause = and(...groupConditions)
+
+    const orderByExpr = isAfterMode
+      ? sql`${sortKey} ASC`
+      : sql`${sortKey} DESC`
 
     const [totalResult, groupResult, items] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(media).where(whereClause),
@@ -67,22 +92,24 @@ export async function getMediaList(req: Request, res: Response) {
           count: sql<number>`count(*)`,
         })
         .from(media)
-        .where(whereClause)
+        .where(groupWhereClause)
         .groupBy(sql`${groupLabel}`)
         .orderBy(sql`${groupLabel} DESC`),
       db
         .select()
         .from(media)
         .where(whereClause)
-        .orderBy(sql`${sortKey} DESC`)
+        .orderBy(orderByExpr)
         .limit(limit)
         .offset(offset),
     ])
 
+    // afterDate 模式：ASC 取到紧邻锚点的更新数据后，反转 → DESC
+    const finalItems = isAfterMode ? [...items].reverse() : items
     const total = totalResult[0]?.count ?? 0
 
     res.json({
-      data: items,
+      data: finalItems,
       pagination: {
         page,
         limit,
