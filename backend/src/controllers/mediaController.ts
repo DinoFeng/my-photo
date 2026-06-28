@@ -44,7 +44,6 @@ export async function getMediaList(req: Request, res: Response) {
     const afterDateRaw = (req.query.afterDate as string) || ''
 
     const sortKey = sql`COALESCE(${media.effectiveTime}, ${media.createdAt})`
-    const groupLabel = sql`strftime('%Y年%m月%d日', ${sortKey})`
 
     // beforeDate: <= 某日期（配合 DESC 排序，看更早的日期）
     // afterDate: > 某日期（配合 ASC 排序，看更近期的日期，紧邻锚点）
@@ -72,29 +71,12 @@ export async function getMediaList(req: Request, res: Response) {
     const isAfterMode = hasAfterDate && !hasBeforeDate
 
     const whereClause = and(...conditions)
-
-    // groups 始终返回全部分组（不受日期窗口影响）
-    const groupConditions = [eq(media.status, 'active')]
-    if (search) groupConditions.push(like(media.filename, `%${search}%`))
-    if (fileType) groupConditions.push(eq(media.fileType, fileType))
-    if (sourcePath) groupConditions.push(eq(media.sourcePath, sourcePath))
-    const groupWhereClause = and(...groupConditions)
-
     const orderByExpr = isAfterMode
       ? sql`${sortKey} ASC`
       : sql`${sortKey} DESC`
 
-    const [totalResult, groupResult, items] = await Promise.all([
+    const [totalResult, items] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(media).where(whereClause),
-      db
-        .select({
-          label: sql<string>`${groupLabel}`,
-          count: sql<number>`count(*)`,
-        })
-        .from(media)
-        .where(groupWhereClause)
-        .groupBy(sql`${groupLabel}`)
-        .orderBy(sql`${groupLabel} DESC`),
       db
         .select()
         .from(media)
@@ -116,11 +98,80 @@ export async function getMediaList(req: Request, res: Response) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-      groups: groupResult,
     })
   } catch (error) {
     log.exception('Failed to get media list', error instanceof Error ? error : undefined)
     res.status(500).json({ error: 'Failed to get media list' })
+  }
+}
+
+// 独立接口：按日期分组统计（供时间线使用）
+// 参数：
+//   - granularity: 'year' | 'month' | 'day'  默认 'day'
+//   - page: 页码（从 1 开始，默认 1）
+//   - limit: 每页条数（默认 20，最大 100）
+//   - search / fileType / sourcePath: 筛选参数
+export async function getMediaGroups(req: Request, res: Response) {
+  try {
+    const granularityRaw = (req.query.granularity as string) || 'day'
+    const granularity: 'year' | 'month' | 'day' =
+      granularityRaw === 'year' ? 'year' : granularityRaw === 'month' ? 'month' : 'day'
+    const page = Math.max(1, parseInt(req.query.page as string) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20))
+    const offset = (page - 1) * limit
+    const search = (req.query.search as string) || ''
+    const fileType = (req.query.fileType as string) || ''
+    const sourcePath = (req.query.sourcePath as string) || ''
+
+    const sortKey = sql`COALESCE(${media.effectiveTime}, ${media.createdAt})`
+
+    // 根据粒度选择 strftime 格式
+    const groupLabel =
+      granularity === 'year'
+        ? sql`strftime('%Y年', ${sortKey})`
+        : granularity === 'month'
+          ? sql`strftime('%Y年%m月', ${sortKey})`
+          : sql`strftime('%Y年%m月%d日', ${sortKey})`
+
+    const conditions = [eq(media.status, 'active')]
+    if (search) conditions.push(like(media.filename, `%${search}%`))
+    if (fileType) conditions.push(eq(media.fileType, fileType))
+    if (sourcePath) conditions.push(eq(media.sourcePath, sourcePath))
+    const whereClause = and(...conditions)
+
+    // 先查分页的分组数据
+    const groupResult = await db
+      .select({
+        label: sql<string>`${groupLabel}`,
+        count: sql<number>`count(*)`,
+      })
+      .from(media)
+      .where(whereClause)
+      .groupBy(sql`${groupLabel}`)
+      .orderBy(sql`${groupLabel} DESC`)
+      .limit(limit)
+      .offset(offset)
+
+    // 再查分组总数（独立查询，避免复杂的嵌套子查询）
+    const totalGroup = await db
+      .select({ count: sql<number>`count(DISTINCT ${groupLabel})` })
+      .from(media)
+      .where(whereClause)
+
+    const total = totalGroup[0]?.count ?? 0
+
+    res.json({
+      groups: groupResult,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
+  } catch (error) {
+    log.exception('Failed to get media groups', error instanceof Error ? error : undefined)
+    res.status(500).json({ error: 'Failed to get media groups' })
   }
 }
 

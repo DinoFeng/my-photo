@@ -4,8 +4,30 @@ import cookieParser from 'cookie-parser'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { appLogger } from '@my-photo/shared'
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.env') })
+
+// ================================================
+// 启动前关键环境变量校验（必须在任何副作用前执行）
+// ================================================
+const _initUsername = process.env.INIT_USERNAME
+const _initPassword = process.env.INIT_PASSWORD
+if (!_initUsername || !_initPassword) {
+  const SEP = '=================================================='
+  appLogger.error(SEP)
+  appLogger.error('[FATAL] 必须配置 INIT_USERNAME 和 INIT_PASSWORD 环境变量')
+  appLogger.error('  否则系统将无法登录。请在启动时设置：')
+  appLogger.error('  Linux/macOS:  INIT_USERNAME=admin INIT_PASSWORD=xxx npm run dev')
+  appLogger.error('  Windows (PS):  $env:INIT_USERNAME="admin"; $env:INIT_PASSWORD="xxx"; npm run dev')
+  appLogger.error('  Windows (CMD): set INIT_USERNAME=admin && set INIT_PASSWORD=xxx && npm run dev')
+  appLogger.error('  Docker:        docker run -e INIT_USERNAME=xxx -e INIT_PASSWORD=xxx ...')
+  appLogger.error('  或在 backend/.env / 项目根 .env 中添加：')
+  appLogger.error('    INIT_USERNAME=admin')
+  appLogger.error('    INIT_PASSWORD=你的密码')
+  appLogger.error(SEP)
+  process.exit(1)
+}
 
 import apiRoutes from './routes/api/index'
 import sseRoutes from './routes/sse/index'
@@ -13,7 +35,6 @@ import shareRoutes from './routes/shareRoutes'
 import { errorHandler, notFoundHandler } from './middleware/errorHandlerMiddleware'
 import { accessLoggerMiddleware, errorLogger } from './middleware/loggerMiddleware'
 import { parseUserSession } from './middleware/authMiddleware'
-import { appLogger } from '@my-photo/shared'
 import { ensureDatabaseReady } from './services/dbInitService'
 import { monitorService, broadcastTask } from './instances/sse'
 import { WsClient } from './utils/wsClient'

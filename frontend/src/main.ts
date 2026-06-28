@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { createI18n } from 'vue-i18n'
+import naive from 'naive-ui'
 import App from './App.vue'
 import routes from './routes'
 import { setupErrorHandler } from './utils/errorHandler'
@@ -134,6 +135,7 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+app.use(naive)
 setupErrorHandler(app)
 
 app.mount('#app')

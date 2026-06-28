@@ -35,6 +35,15 @@ export interface MediaGroup {
 
 interface MediaResponse {
   data: Media[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+interface MediaGroupsResponse {
   groups: MediaGroup[]
   pagination: {
     page: number
@@ -42,6 +51,48 @@ interface MediaResponse {
     total: number
     totalPages: number
   }
+}
+
+export type GroupGranularity = 'year' | 'month' | 'day'
+
+// 将时间线 label 解析为日期范围 (afterDate, beforeDate)
+// "2026年" → { afterDate: '2025-12-31', beforeDate: '2026-12-31' }
+// "2026年06月" → { afterDate: '2026-05-31', beforeDate: '2026-06-30' }
+// "2026年06月28日" → { afterDate: '2026-06-27', beforeDate: '2026-06-28' }
+function parseGroupLabel(label: string): { afterDate: string; beforeDate: string } | null {
+  // 年：YYYY年
+  let m = label.match(/^(\d{4})年$/)
+  if (m) {
+    const year = parseInt(m[1])
+    return { afterDate: `${year - 1}-12-31`, beforeDate: `${year}-12-31` }
+  }
+  // 月：YYYY年MM月
+  m = label.match(/^(\d{4})年(\d{2})月$/)
+  if (m) {
+    const year = parseInt(m[1])
+    const month = parseInt(m[2])
+    // 计算该月最后一天
+    const lastDay = new Date(year, month, 0).getDate()
+    const prevMonthLastDay = new Date(year, month - 1, 0).getDate()
+    return {
+      afterDate: `${year}-${String(month - 1).padStart(2, '0')}-${String(prevMonthLastDay).padStart(2, '0')}`,
+      beforeDate: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    }
+  }
+  // 日：YYYY年MM月DD日
+  m = label.match(/^(\d{4})年(\d{2})月(\d{2})日$/)
+  if (m) {
+    const year = parseInt(m[1])
+    const month = parseInt(m[2])
+    const day = parseInt(m[3])
+    // 前一天
+    const prevDate = new Date(year, month - 1, day - 1)
+    return {
+      afterDate: `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`,
+      beforeDate: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+    }
+  }
+  return null
 }
 
 function parseDateLabel(label: string): string | null {
@@ -53,6 +104,13 @@ function parseDateLabel(label: string): string | null {
 export const useMediaStore = defineStore('media', () => {
   const mediaList = ref<Media[]>([])
   const mediaGroups = ref<MediaGroup[]>([])
+  const loadingGroups = ref(false)
+  const loadingMoreGroups = ref(false)
+  const groupGranularity = ref<GroupGranularity>('year')
+  const groupPage = ref(1)
+  const groupTotalPages = ref(1)
+  const groupFilterLabel = ref<string>('') // 当前用于筛选图片的 group label
+  const hasMoreGroups = computed(() => groupPage.value < groupTotalPages.value)
   const loading = ref(false)
   const loadingMore = ref(false)
   const loadingNewer = ref(false)
@@ -150,7 +208,6 @@ export const useMediaStore = defineStore('media', () => {
       const data = await apiClient.get<MediaResponse>(`/media?${params}`)
 
       mediaList.value = mergeMedia(mediaList.value, data.data, mode)
-      if (data.groups) mediaGroups.value = data.groups
       totalCount.value = data.pagination.total
 
       return {
@@ -165,6 +222,78 @@ export const useMediaStore = defineStore('media', () => {
       loading.value = false
       loadingMore.value = false
       loadingNewer.value = false
+    }
+  }
+
+  // 独立接口：加载日期分组（时间线用），支持分页 + 粒度切换
+  const loadMediaGroups = async (opts: { reset?: boolean } = {}) => {
+    const reset = opts.reset ?? true
+    const targetPage = reset ? 1 : groupPage.value + 1
+
+    // reset 模式：标记 loadingGroups，否则 loadingMoreGroups
+    if (reset) {
+      if (loadingGroups.value) return null
+      loadingGroups.value = true
+    } else {
+      if (loadingMoreGroups.value || !hasMoreGroups.value) return null
+      loadingMoreGroups.value = true
+    }
+
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        limit: '20',
+        granularity: groupGranularity.value,
+      })
+      if (searchQuery.value) params.set('search', searchQuery.value)
+      if (fileTypeFilter.value) params.set('fileType', fileTypeFilter.value)
+      if (sourcePathFilter.value) params.set('sourcePath', sourcePathFilter.value)
+
+      const data = await apiClient.get<MediaGroupsResponse>(`/media/groups?${params.toString()}`)
+
+      mediaGroups.value = reset ? data.groups : [...mediaGroups.value, ...data.groups]
+      groupPage.value = data.pagination.page
+      groupTotalPages.value = data.pagination.totalPages
+
+      return data.groups
+    } catch (error) {
+      console.error('Failed to load media groups:', error)
+      return null
+    } finally {
+      loadingGroups.value = false
+      loadingMoreGroups.value = false
+    }
+  }
+
+  const loadMoreGroups = () => loadMediaGroups({ reset: false })
+
+  // 切换分组粒度：清空并重新加载 groups，然后用第一个 group 重新加载图片
+  const setGroupGranularity = async (granularity: GroupGranularity) => {
+    if (groupGranularity.value === granularity) return
+    groupGranularity.value = granularity
+    groupPage.value = 1
+    groupTotalPages.value = 1
+    mediaGroups.value = []
+    const groups = await loadMediaGroups({ reset: true })
+    // 用第一个 group 的日期范围加载图片
+    if (groups && groups.length > 0) {
+      const firstLabel = groups[0].label
+      groupFilterLabel.value = firstLabel
+      activeDate.value = firstLabel
+      const range = parseGroupLabel(firstLabel)
+      const res = await loadMedia({
+        page: 1,
+        beforeDate: range?.beforeDate,
+        afterDate: range?.afterDate,
+        mode: 'replace',
+      })
+      if (res) {
+        normalPage.value = res.page
+        normalTotalPages.value = res.totalPages
+      }
+    } else {
+      mediaList.value = []
+      groupFilterLabel.value = ''
     }
   }
 
@@ -183,25 +312,14 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   const loadMore = async () => {
-    // 有锚点 → 双向分页下滚（更旧）
-    if (anchorDateIso.value) {
-      if (loadingMore.value || !hasMoreOlder.value) return
-      const nextPage = olderPage.value + 1
-      const res = await loadMedia({
-        page: nextPage,
-        beforeDate: anchorDateIso.value,
-        mode: 'append',
-      })
-      if (res) {
-        olderPage.value = res.page
-        hasMoreOlder.value = res.page < res.totalPages && res.count > 0
-      }
-      return
-    }
-
-    // 无锚点 → 常规单向分页
     if (loadingMore.value || !hasMoreNormal.value) return
-    const res = await loadMedia({ page: normalPage.value + 1, mode: 'append' })
+    const range = groupFilterLabel.value ? parseGroupLabel(groupFilterLabel.value) : null
+    const res = await loadMedia({
+      page: normalPage.value + 1,
+      beforeDate: range?.beforeDate,
+      afterDate: range?.afterDate,
+      mode: 'append',
+    })
     if (res) {
       normalPage.value = res.page
       normalTotalPages.value = res.totalPages
@@ -209,35 +327,58 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   const loadNewer = async () => {
-    // 有锚点 → 双向分页上滚（更新）
-    if (anchorDateIso.value) {
-      if (loadingNewer.value || !hasMoreNewer.value) return
-      // 关键：newerPage 表示"已加载到的页码"，初始为0表示还没加载任何更新日期
-      // 所以下一次应该加载 newerPage + 1
-      const nextPage = newerPage.value + 1
-      const res = await loadMedia({
-        page: nextPage,
-        afterDate: anchorDateIso.value,
-        mode: 'prepend',
-      })
-      if (res) {
-        newerPage.value = res.page
-        hasMoreNewer.value = res.page < res.totalPages && res.count > 0
-      }
-      return
-    }
-
-    // 无锚点 → 已经在最前面了，无"更新"方向
+    // group 筛选模式下不支持向上加载（单向分页）
     return
   }
 
   const resetAndLoad = async () => {
     clearAll()
-    const res = await loadMedia({ page: 1, mode: 'replace' })
+    // 1. 先加载 groups（按年分组）
+    const groups = await loadMediaGroups({ reset: true })
+    if (groups && groups.length > 0) {
+      // 2. 取第一个 group（如 "2026年"），用它的日期范围来加载图片
+      const firstLabel = groups[0].label
+      groupFilterLabel.value = firstLabel
+      activeDate.value = firstLabel
+      const range = parseGroupLabel(firstLabel)
+      // 3. 用该日期范围调用 media API
+      const res = await loadMedia({
+        page: 1,
+        beforeDate: range?.beforeDate,
+        afterDate: range?.afterDate,
+        mode: 'replace',
+      })
+      if (res) {
+        normalPage.value = res.page
+        normalTotalPages.value = res.totalPages
+      }
+    } else {
+      // 无分组数据，直接全量加载
+      const res = await loadMedia({ page: 1, mode: 'replace' })
+      if (res) {
+        normalPage.value = res.page
+        normalTotalPages.value = res.totalPages
+      }
+    }
+  }
+
+  // 点击时间线的某个 group → 切换到该日期范围，重新加载图片
+  const jumpToGroup = async (label: string) => {
+    const range = parseGroupLabel(label)
+    if (!range) return null
+    groupFilterLabel.value = label
+    activeDate.value = label
+    const res = await loadMedia({
+      page: 1,
+      beforeDate: range.beforeDate,
+      afterDate: range.afterDate,
+      mode: 'replace',
+    })
     if (res) {
       normalPage.value = res.page
       normalTotalPages.value = res.totalPages
     }
+    return label
   }
 
   // 跳转到指定日期：以该日期为锚点，加载锚点附近的图片
@@ -375,22 +516,36 @@ export const useMediaStore = defineStore('media', () => {
     loading,
     loadingMore,
     loadingNewer,
+    loadingGroups,
+    loadingMoreGroups,
+    groupGranularity,
+    groupPage,
+    groupTotalPages,
+    hasMoreGroups,
     searchQuery,
     totalCount,
     hasMoreOlder,
     hasMoreNewer,
+    hasMoreNormal,
+    normalPage,
+    normalTotalPages,
     fileTypeFilter,
     sourcePathFilter,
     activeDate,
     anchorDateIso,
+    groupFilterLabel,
     olderPage,
     newerPage,
     recentlyAdded,
     loadMedia,
+    loadMediaGroups,
+    loadMoreGroups,
+    setGroupGranularity,
     loadMore,
     loadNewer,
     resetAndLoad,
     jumpToDate,
+    jumpToGroup,
     addMedia,
     deleteMedia,
     setActiveDate,

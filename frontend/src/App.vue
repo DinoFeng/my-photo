@@ -1,6 +1,8 @@
 <template>
   <div v-if="isSharePage" class="share-root">
-    <router-view />
+    <n-message-provider>
+      <router-view />
+    </n-message-provider>
   </div>
   <div v-else class="app-layout">
     <aside class="sidebar">
@@ -14,7 +16,7 @@
           <span>{{ t('gallery') }}</span>
         </router-link>
         <router-link to="/albums" class="nav-item" :class="{ active: $route.name === 'albums' || $route.name === 'album-detail' }">
-          <Images :size="20" />
+          <Folder :size="20" />
           <span>相册</span>
         </router-link>
         <router-link to="/settings" class="nav-item" :class="{ active: $route.name === 'settings' }">
@@ -36,7 +38,9 @@
       </div>
     </aside>
     <main class="main-content">
-      <router-view />
+      <n-message-provider class="message-provider-wrapper">
+        <router-view />
+      </n-message-provider>
     </main>
     <RecentScanThumbnails />
   </div>
@@ -46,7 +50,7 @@
 import { useI18n } from 'vue-i18n'
 import { onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Image, LayoutGrid, Settings, Images, Users } from 'lucide-vue-next'
+import { Image, LayoutGrid, Settings, Folder, Users } from 'lucide-vue-next'
 import { useMonitorStore } from './stores/monitorStore'
 import RecentScanThumbnails from './components/RecentScanThumbnails.vue'
 import { useAuthStore } from './stores/auth'
@@ -75,6 +79,11 @@ onUnmounted(() => {
 </script>
 
 <style>
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -90,17 +99,24 @@ body {
 }
 
 .app-layout {
-  display: flex;
+  position: relative;
+  width: 100%;
   height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
   width: 220px;
   background: #1e1e2e;
   color: #cdd6f4;
   display: flex;
   flex-direction: column;
   padding: 16px;
+  overflow: hidden;
 }
 
 .logo {
@@ -186,8 +202,37 @@ body {
 }
 
 .main-content {
-  flex: 1;
+  position: absolute;
+  top: 0;
+  left: 220px;
+  right: 0;
+  bottom: 0;
   background: #181825;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.main-content > * {
+  height: 100%;
+  width: 100%;
+}
+
+.message-provider-wrapper {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 穿透：只影响直接的容器层级，不影响内容元素 */
+.message-provider-wrapper :deep(.n-message-provider) {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 只影响直接的容器 div，不影响 button/span 等内容元素 */
+.message-provider-wrapper :deep(.n-message-provider) > div {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 </style>

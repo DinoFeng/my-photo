@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { eq, and, sql } from 'drizzle-orm'
 import { db, session, user } from '@my-photo/shared'
+import { verifyPassword } from '../utils/securityUtils'
 
 export interface AuthenticatedUser {
   id: string
@@ -98,4 +99,68 @@ export function clearSessionCookie(res: Response) {
 export const SESSION_CONFIG = {
   COOKIE: SESSION_COOKIE,
   DURATION_MS: SESSION_DURATION_MS,
+}
+
+function parseBasicAuthHeader(header: string | undefined): { username: string; password: string } | null {
+  if (!header || !header.toLowerCase().startsWith('basic ')) return null
+  try {
+    const encoded = header.slice(6)
+    const decoded = Buffer.from(encoded, 'base64').toString('utf-8')
+    const colonIdx = decoded.indexOf(':')
+    if (colonIdx === -1) return null
+    return { username: decoded.slice(0, colonIdx), password: decoded.slice(colonIdx + 1) }
+  } catch {
+    return null
+  }
+}
+
+async function authenticateBasic(req: Request): Promise<boolean> {
+  const credentials = parseBasicAuthHeader(req.headers.authorization)
+  if (!credentials) return false
+
+  const result = await db
+    .select({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarEmoji: user.avatarEmoji,
+      passwordHash: user.passwordHash,
+      isAdmin: user.isAdmin,
+      status: user.status,
+    })
+    .from(user)
+    .where(eq(user.username, credentials.username))
+    .limit(1)
+
+  if (result.length === 0) return false
+  const row = result[0]
+  if (row.status !== 'active') return false
+  if (!row.passwordHash || !verifyPassword(credentials.password, row.passwordHash)) return false
+
+  req.user = {
+    id: row.id,
+    displayName: row.displayName,
+    avatarEmoji: row.avatarEmoji,
+    isAdmin: row.isAdmin ? true : false,
+    status: row.status,
+  }
+  return true
+}
+
+export async function basicAuth(req: Request, res: Response, next: NextFunction) {
+  if (req.user) return next()
+  const ok = await authenticateBasic(req)
+  if (!ok) {
+    return res
+      .status(401)
+      .setHeader('WWW-Authenticate', 'Basic realm="my-photo"')
+      .json({ error: '需要认证' })
+  }
+  next()
+}
+
+export async function basicAuthOptional(req: Request, _res: Response, next: NextFunction) {
+  if (req.user) return next()
+  await authenticateBasic(req)
+  next()
 }

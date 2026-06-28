@@ -16,11 +16,11 @@
         <div class="tabs">
           <button
             :class="['tab', { active: loginMode === 'password' }]"
-            @click="loginMode = 'password'"
+            @click="setLoginMode('password')"
           >🔑 管理员登录</button>
           <button
             :class="['tab', { active: loginMode === 'code' }]"
-            @click="loginMode = 'code'"
+            @click="setLoginMode('code')"
           >🎫 邀请码登录</button>
         </div>
 
@@ -110,6 +110,11 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function setLoginMode(mode: 'password' | 'code') {
+  loginMode.value = mode
+  errorMessage.value = ''
+}
 
 async function doLogin() {
   if (!passwordForm.username || !passwordForm.password) {

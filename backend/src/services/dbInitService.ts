@@ -1,5 +1,5 @@
 import { sql, count, eq } from 'drizzle-orm'
-import * as fs from 'fs'
+import fs from 'fs'
 import { db, config, appLogger, media, user as userTable, session as sessionTable } from '@my-photo/shared'
 import { hashPassword, generateRandomId } from '../utils/securityUtils'
 
@@ -181,12 +181,18 @@ async function ensureAdminUser() {
   const initPassword = process.env.INIT_PASSWORD
 
   if (!initUsername || !initPassword) {
-    log.warn('==================================================')
-    log.warn('未配置 INIT_USERNAME 和 INIT_PASSWORD 环境变量')
-    log.warn('请在启动容器时设置：')
-    log.warn('  docker run -e INIT_USERNAME=xxx -e INIT_PASSWORD=xxx ...')
-    log.warn('==================================================')
-    return
+    log.error('==================================================')
+    log.error('必须配置 INIT_USERNAME 和 INIT_PASSWORD 环境变量')
+    log.error('否则系统将无法登录。请在启动时设置：')
+    log.error('  Linux/macOS:  INIT_USERNAME=admin INIT_PASSWORD=xxx npm run dev')
+    log.error('  Windows (PowerShell): $env:INIT_USERNAME="admin"; $env:INIT_PASSWORD="xxx"; npm run dev')
+    log.error('  Windows (CMD):    set INIT_USERNAME=admin && set INIT_PASSWORD=xxx && npm run dev')
+    log.error('  Docker:           docker run -e INIT_USERNAME=xxx -e INIT_PASSWORD=xxx ...')
+    log.error('  或在 backend/.env 文件中添加：')
+    log.error('    INIT_USERNAME=admin')
+    log.error('    INIT_PASSWORD=你的密码')
+    log.error('==================================================')
+    process.exit(1)
   }
 
   // 1. 查数据库中 is_admin=1 的用户
